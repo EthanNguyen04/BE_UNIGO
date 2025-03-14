@@ -1,17 +1,20 @@
 const express = require("express");
 const cors = require("cors");
-const morgan = require("morgan");
+const dotenv = require("dotenv");
+
+dotenv.config();
+const connectDB = require("./config/db");
 
 const app = express();
-
-// Middleware
 app.use(express.json());
 app.use(cors());
-app.use(morgan("dev"));
 
-// Routes
-app.get("/", (req, res) => {
-    res.send("🚀 API is running...");
-});
+// Kết nối MongoDB
+connectDB();
+
+// Định tuyến API
+app.use("/api/user", require("./routes/userRoutes"));
+app.use("/api/auth", require("./routes/authRouter"));
+
 
 module.exports = app;
