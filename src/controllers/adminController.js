@@ -21,7 +21,7 @@ async function sendOTPEmail(toEmail, otp) {
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: toEmail,
-        subject: 'Xác thực đăng nhập Admin',
+        subject: 'Xác thực tài khoản',
         text: `Mã OTP của bạn là: ${otp}`
     };
 
@@ -29,7 +29,7 @@ async function sendOTPEmail(toEmail, otp) {
 }
 
 // Hàm đăng xuất Admin
-exports.adminLogout = async (req, res) => {
+const adminLogout = async (req, res) => {
     try {
         const { token } = req.body;
 
@@ -53,7 +53,7 @@ exports.adminLogout = async (req, res) => {
             user.invalidTokens.push(token);
             await user.save();
 
-            return res.status(200).json({ message: 'Đăng xuất thành công!' });
+            return res.status(200).json({ message: 'Đăng xuất admin thành công!' });
         } catch (err) {
             return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
         }
@@ -136,4 +136,6 @@ const adminController = {
         }
     }
 };
+
+adminController.adminLogout = adminLogout;
 module.exports = adminController;
