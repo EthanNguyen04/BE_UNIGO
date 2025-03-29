@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const productSchema = new mongoose.Schema({
     name: { type: String, required: true }, // Tên sản phẩm
     category_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: false }, // ID danh mục sản phẩm (có thể trống).

@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const discountCodeSchema = new mongoose.Schema({
     code: { type: String, required: true, unique: true }, // Mã giảm giá (duy nhất)
     discount_percent: { type: Number, required: true }, // Phần trăm giảm giá

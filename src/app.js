@@ -17,4 +17,9 @@ app.use("/api/user", require("./routes/userRoutes"));
 
 
 
+app.use("/api/admin", require("./routes/categoryRouters"));
+
+
+
+
 module.exports = app;
