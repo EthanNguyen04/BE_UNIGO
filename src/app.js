@@ -14,7 +14,6 @@ connectDB();
 
 // Định tuyến API
 app.use("/api/user", require("./routes/userRoutes"));
-app.use("/api/auth", require("./routes/authRouter"));
 
 
 
