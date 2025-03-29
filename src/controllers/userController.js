@@ -39,9 +39,8 @@ exports.userLogout = async (req, res) => {
 
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-            // Vô hiệu hóa token bằng cách lưu vào danh sách invalidTokens
             const user = await User.findById(decoded.userId);
+
             if (!user) {
                 return res.status(404).json({ message: 'Người dùng không tồn tại!' });
             }
@@ -99,24 +98,21 @@ exports.getUserInfo = async (req, res) => {
 
 exports.createUser = async (req, res) => {
     try {
-        const { email, password, full_name } = req.body;
+        let { email, password, full_name } = req.body;
+        email = email.toLowerCase();
 
-        // Kiểm tra đầu vào
         if (!email || !password || !full_name) {
             return res.status(422).json({ message: 'Vui lòng nhập đầy đủ thông tin!' });
         }
 
-        // Kiểm tra email đã tồn tại chưa
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'Email đã tồn tại!' });
         }
 
-        // Mã hóa mật khẩu
         const hashedPassword = await bcrypt.hash(password, 10);
         const otp = generateOTP();
 
-        // Tạo user mới
         const newUser = new User({
             email,
             password: hashedPassword,
@@ -137,9 +133,9 @@ exports.createUser = async (req, res) => {
 
 exports.loginUser = async (req, res) => {
     try {
-        const { email, password, otp, token } = req.body;
+        let { email, password, otp, token } = req.body;
+        email = email.toLowerCase();
 
-        // Trường hợp đăng nhập bằng token
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -149,7 +145,6 @@ exports.loginUser = async (req, res) => {
             }
         }
 
-        // Kiểm tra đầu vào
         if (!email || !password) {
             return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu!' });
         }
@@ -159,13 +154,11 @@ exports.loginUser = async (req, res) => {
             return res.status(404).json({ message: 'Tài khoản không tồn tại!' });
         }
 
-        // Kiểm tra mật khẩu
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Mật khẩu không đúng!' });
         }
 
-        // Gửi OTP nếu chưa có
         if (!otp) {
             const generatedOTP = generateOTP();
             user.otp = generatedOTP;
@@ -175,18 +168,15 @@ exports.loginUser = async (req, res) => {
             return res.status(200).json({ message: 'OTP đã được gửi đến email.' });
         }
 
-        // Xác minh OTP
         if (otp !== user.otp || Date.now() > user.otpExpiresAt) {
             return res.status(401).json({ message: 'OTP không hợp lệ hoặc đã hết hạn.' });
         }
 
-        // Cập nhật trạng thái tài khoản
         user.account_status = 'active';
         user.otp = null;
         user.otpExpiresAt = null;
         await user.save();
 
-        // Tạo JWT token
         const newToken = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
         return res.status(200).json({ message: 'Đăng nhập thành công!', token: newToken });
