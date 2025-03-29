@@ -28,6 +28,40 @@ async function sendOTPEmail(toEmail, otp) {
     await transporter.sendMail(mailOptions);
 }
 
+// Hàm đăng xuất Admin
+exports.adminLogout = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
+        }
+
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            // Vô hiệu hóa token bằng cách lưu vào danh sách invalidTokens
+            const user = await User.findById(decoded.userId);
+            if (!user) {
+                return res.status(404).json({ message: 'Người dùng không tồn tại!' });
+            }
+
+            if (!user.invalidTokens) {
+                user.invalidTokens = [];
+            }
+
+            user.invalidTokens.push(token);
+            await user.save();
+
+            return res.status(200).json({ message: 'Đăng xuất thành công!' });
+        } catch (err) {
+            return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
+        }
+    } catch (error) {
+        return res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
+};
+
 const adminController = {
     // Phương thức đăng nhập Admin
     async adminLogin(req, res) {
