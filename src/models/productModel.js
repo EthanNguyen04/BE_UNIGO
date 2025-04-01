@@ -8,7 +8,12 @@ const productSchema = new mongoose.Schema({
     colors: { type: [String], default: [] }, // Các màu có sẵn của sản phẩm
     quantity: { type: Number, default: 0 }, // Số lượng tồn kho
     image_urls: { type: [String], validate: v => Array.isArray(v) && v.length <= 6 }, // Danh sách URL ảnh (tối đa 6 ảnh)
-    description: { type: String, default: '' }, // Mô tả chi tiết sản phẩm
+    description: { type: String, default: '',required: true }, // Mô tả chi tiết sản phẩm
+    status: {
+        type: String,
+        enum: ['dang_ban', 'het_hang', 'ngung_ban'],
+        default: 'dang_ban'
+    } // Trạng thái: đang bán, hết hàng, ngừng bán
 });
 
 const Product = mongoose.model('Product', productSchema);
