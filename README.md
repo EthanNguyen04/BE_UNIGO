@@ -48,9 +48,4 @@ Server sẽ chạy tại `http://localhost:3000`
 - dotenv (Quản lý biến môi trường)
 
 ## 📌 API Endpoints
-| Phương thức | Endpoint          | Mô tả                   |
-|------------|--------------------|-------------------------|
-| POST       | api/auth/sendOtp   | gửi otp cho người dùng  |
-| POST       | /api/user/register | Tạo người dùng mới      |
-
 
