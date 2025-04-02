@@ -228,11 +228,12 @@ exports.getDeXuatProducts = async (req, res) => {
 
 
 // Mô tả: Lấy 10 sản phẩm bất kỳ có trạng thái 'dang_ban', ưu tiên các sản phẩm có giá giảm
+
 exports.getSaleProducts = async (req, res) => {
     try {
         const products = await Product.aggregate([
-            { $match: { status: 'dang_ban' } },
-            { $sample: { size: 10 } }
+            { $match: { status: 'dang_ban', discount_price: { $gt: 0 } } },
+            { $limit: 10 }
         ]);
 
         const result = products.map(product => {
