@@ -184,3 +184,43 @@ exports.getProductsByCategoryId = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi máy chủ', error: error.message });
     }
 };
+
+// API getDeXuatProducts: Lấy danh sách 20 sản phẩm đề xuất
+// Mô tả: Lấy danh sách sản phẩm có trạng thái 'dang_ban', ưu tiên các sản phẩm có tỷ lệ giảm giá nhiều nhất
+// Trả về: Tên sản phẩm, giá gốc, giá giảm (nếu có), link ảnh đầu tiên
+// Sắp xếp: Theo tỷ lệ giảm giá từ cao xuống thấp
+
+exports.getDeXuatProducts = async (req, res) => {
+    try {
+        const products = await Product.find({ status: 'dang_ban' });
+
+        const result = products
+            .map(product => {
+                const discountPercent = product.discount_price > 0 ? (product.price - product.discount_price) / product.price : 0;
+                let price, original_price, discount_price;
+                if (product.discount_price > 0) {
+                    price = product.discount_price;
+                    original_price = product.discount_price;
+                    discount_price = product.price;
+                } else {
+                    price = product.price;
+                    original_price = product.price;
+                    discount_price = 0;
+                }
+                return {
+                    name: product.name,
+                    price: price,
+                    original_price: original_price,
+                    discount_price: discount_price,
+                    link: product.image_urls.length > 0 ? product.image_urls[0] : '',
+                    discountPercent: discountPercent
+                };
+            })
+            .sort((a, b) => b.discountPercent - a.discountPercent)
+            .slice(0, 20);
+
+        return res.status(200).json({ products: result });
+    } catch (error) {
+        return res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
+};
