@@ -213,11 +213,39 @@ exports.getDeXuatProducts = async (req, res) => {
                     original_price: original_price,
                     discount_price: discount_price,
                     link: product.image_urls.length > 0 ? product.image_urls[0] : '',
-                    discountPercent: discountPercent
                 };
             })
             .sort((a, b) => b.discountPercent - a.discountPercent)
             .slice(0, 20);
+
+        return res.status(200).json({ products: result });
+    } catch (error) {
+        return res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
+};
+
+
+
+
+// Mô tả: Lấy 10 sản phẩm bất kỳ có trạng thái 'dang_ban', ưu tiên các sản phẩm có giá giảm
+exports.getSaleProducts = async (req, res) => {
+    try {
+        const products = await Product.aggregate([
+            { $match: { status: 'dang_ban' } },
+            { $sample: { size: 10 } }
+        ]);
+
+        const result = products.map(product => {
+            const discountPercent = product.discount_price > 0 ? Math.max(Math.ceil((1 - product.discount_price / product.price) * 100), 1) : 0;
+            const salePrice = product.discount_price > 0 ? product.discount_price : product.price;
+            return {
+                name: product.name,
+                price: product.price,
+                sale_price: salePrice,
+                discount_percent: discountPercent > 100 ? 100 : discountPercent,
+                link: product.image_urls.length > 0 ? product.image_urls[0] : ''
+            };
+        });
 
         return res.status(200).json({ products: result });
     } catch (error) {
