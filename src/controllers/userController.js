@@ -5,7 +5,7 @@ const User = require('../models/userModel');
 
 // Hàm tạo OTP ngẫu nhiên
 function generateOTP() {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 // Hàm gửi email OTP
@@ -31,7 +31,7 @@ async function sendOTPEmail(toEmail, otp) {
 // Hàm đăng xuất User
 exports.userLogout = async (req, res) => {
     try {
-        const { token } = req.body;
+        const token = req.headers['authorization'];
 
         if (!token) {
             return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
@@ -61,10 +61,11 @@ exports.userLogout = async (req, res) => {
     }
 };
 
+
 // Hàm lấy thông tin người dùng từ token
 exports.getUserInfo = async (req, res) => {
     try {
-        const { token } = req.body;
+        const token = req.headers['authorization'];
 
         if (!token) {
             return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
