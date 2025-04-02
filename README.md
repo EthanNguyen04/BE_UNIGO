@@ -30,7 +30,10 @@ yarn install
 Tạo file `.env` và thêm các biến môi trường cần thiết:
 ```
 PORT=3000
-DB_URL=mongodb://localhost:27017/unigo 
+MONGO_URI=mongodb://localhost:27017/unigo 
+EMAIL_USER= <email admin>
+EMAIL_PASS= <pass truy cập dịch vụ gmail>
+JWT_SECRET= <mã hóa>
 ```
 ### 3️⃣ Chạy server
 ```sh
