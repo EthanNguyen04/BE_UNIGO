@@ -7,6 +7,7 @@ router.get('/products', productController.getAllProductsDangBan);
 router.get('/products/:id', productController.getProductsByCategoryId);
 
 router.get('/products_dx', productController.getDeXuatProducts);
+router.get('/products_sale', productController.getSaleProducts);
 
 
 module.exports = router;
