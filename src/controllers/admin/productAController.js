@@ -1,15 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const Product = require('../models/productModel');
-const Category = require('../models/categoryModel');
-const User = require('../models/userModel');
+const Product = require('../../models/productModel');
+const Category = require('../../models/categoryModel');
+const User = require('../../models/userModel');
 const multer = require('multer');
 
 // Cấu hình Multer dùng bộ nhớ tạm, chúng ta sẽ tự xử lý việc lưu
 const storage = multer.memoryStorage();
 const upload = multer({ storage }).array('images', 6); // tối đa 6 ảnh
-a
+
 
 
 exports.addProduct = (req, res) => {
