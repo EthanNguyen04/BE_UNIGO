@@ -10,6 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // Kết nối MongoDB
 connectDB();

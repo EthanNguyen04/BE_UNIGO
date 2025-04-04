@@ -208,11 +208,11 @@ exports.getDeXuatProducts = async (req, res) => {
                     discount_price = 0;
                 }
                 return {
+                    id: product._id,
+                    link: product.image_urls.length > 0 ? product.image_urls[0] : '',
                     name: product.name,
-                    price: price,
                     original_price: original_price,
                     discount_price: discount_price,
-                    link: product.image_urls.length > 0 ? product.image_urls[0] : '',
                 };
             })
             .sort((a, b) => b.discountPercent - a.discountPercent)
@@ -240,6 +240,7 @@ exports.getSaleProducts = async (req, res) => {
             const discountPercent = product.discount_price > 0 ? Math.max(Math.ceil((1 - product.discount_price / product.price) * 100), 1) : 0;
             const salePrice = product.discount_price > 0 ? product.discount_price : product.price;
             return {
+                id: product._id,
                 name: product.name,
                 price: product.price,
                 sale_price: salePrice,

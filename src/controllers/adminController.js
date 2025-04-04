@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/userModel');
+const path = require('path');
 
 // Hàm tạo OTP ngẫu nhiên
 function generateOTP() {
@@ -9,25 +10,73 @@ function generateOTP() {
 }
 
 // Hàm gửi email OTP
-async function sendOTPEmail(toEmail, otp) {
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        }
-    });
+// async function sendOTPEmail(toEmail, otp) {
+//     const transporter = nodemailer.createTransport({
+//         service: 'gmail',
+//         auth: {
+//             user: process.env.EMAIL_USER,
+//             pass: process.env.EMAIL_PASS
+//         }
+//     });
 
-    const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: toEmail,
-        subject: 'Xác thực tài khoản',
-        text: `Mã OTP của bạn là: ${otp}`
-    };
+//     const mailOptions = {
+//         from: process.env.EMAIL_USER,
+//         to: toEmail,
+//         subject: 'Xác thực tài khoản',
+//         text: `Mã OTP của bạn là: ${otp}`
+//     };
 
-    await transporter.sendMail(mailOptions);
+//     await transporter.sendMail(mailOptions);
+// }
+async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài khoản', customText = '', logoUrl = '') {
+    try {
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+        const logoPath = path.resolve(__dirname, '../public/logo/Unigo.png');
+        // Tạo nội dung HTML đẹp với logo và text tùy chỉnh
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="cid:logo" alt="Logo" style="width: 100px; height: auto;"/>
+                </div>
+                <h2 style="text-align: center; color: #0056b3;">${customSubject}</h2>
+                <p style="text-align: center; font-size: 16px; color: #333;">${customText || 'Mã OTP của bạn là:'}</p>
+                <div style="text-align: center; margin: 20px 0;">
+                    <span style="display: inline-block; background-color: #0056b3; color: #fff; padding: 10px 20px; border-radius: 5px; font-size: 24px; letter-spacing: 3px;">${otp}</span>
+                </div>
+                <p style="font-size: 14px; color: #555; text-align: center;">Vui lòng không chia sẻ mã này với bất kỳ ai để đảm bảo an toàn.</p>
+                <hr style="margin: 20px 0;"/>
+                <p style="font-size: 12px; color: #777; text-align: center;">Email được gửi từ hệ thống. Vui lòng không trả lời email này.</p>
+            </div>
+        `;
+
+        // Nội dung email
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: toEmail,
+            subject: customSubject,
+            html: htmlContent,
+            attachments: [
+                {
+                    filename: 'Unigo.png',
+                    path: logoPath,
+                    cid: 'logo' // Content ID để nhúng vào HTML
+                }
+            ]
+        };
+
+        // Gửi email
+        await transporter.sendMail(mailOptions);
+        console.log('Email OTP đã được gửi thành công!');
+    } catch (error) {
+        console.error('Lỗi khi gửi email OTP:', error);
+    }
 }
-
 // Hàm đăng xuất Admin
 const adminLogout = async (req, res) => {
     try {

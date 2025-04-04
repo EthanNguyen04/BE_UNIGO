@@ -11,7 +11,10 @@ const userSchema = new mongoose.Schema({
         type: String, 
         enum: ["pending", "active", "disabled"], 
         default: "pending" 
-    }, // Trạng thái tài khoản (biến độc lập, không phải mảng)
+    }, // Trạng thái tài khoản 
+    // pedning: đăng kí nhưng chưa xác minh,
+    //  active: đã xác minh có thể đăng nhập,
+    //  dis: người dùng bị chặn (biến độc lập, không phải mảng) 
     otp: { type: String },
     otpExpiresAt: { type: Date },
     otp_verified: { type: Boolean, default: false },  // Thêm trạng thái OTP
