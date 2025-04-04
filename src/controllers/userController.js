@@ -170,7 +170,8 @@ exports.createUser = async (req, res) => {
             full_name,
             otp,
             otpExpiresAt: Date.now() + 5 * 60 * 1000,
-            account_status: 'pending'
+            account_status: 'pending',
+            otp_type: 'login' 
         });
 
         await newUser.save();
@@ -210,27 +211,118 @@ exports.loginUser = async (req, res) => {
             return res.status(401).json({ message: 'Mật khẩu không đúng!' });
         }
 
+        // Nếu chưa gửi OTP, gửi OTP về email của người dùng
         if (!otp) {
             const generatedOTP = generateOTP();
             user.otp = generatedOTP;
             user.otpExpiresAt = Date.now() + 5 * 60 * 1000;
+            // Đảm bảo otp_type được đặt là "login"
+            user.otp_type = 'login';
             await user.save();
             await sendOTPEmail(user.email, generatedOTP);
             return res.status(200).json({ message: 'OTP đã được gửi đến email.' });
         }
 
-        if (otp !== user.otp || Date.now() > user.otpExpiresAt) {
+        // Kiểm tra OTP, thời gian hết hạn và otp_type
+        if (otp !== user.otp || Date.now() > user.otpExpiresAt || user.otp_type !== 'login') {
             return res.status(401).json({ message: 'OTP không hợp lệ hoặc đã hết hạn.' });
         }
 
+        // Xác thực OTP thành công, chuyển trạng thái tài khoản sang active
         user.account_status = 'active';
         user.otp = null;
         user.otpExpiresAt = null;
+        user.otp_type = null;  // Reset otp_type sau khi đã sử dụng
         await user.save();
 
         const newToken = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
         return res.status(200).json({ message: 'Đăng nhập thành công!', token: newToken });
+    } catch (error) {
+        return res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
+};
+
+exports.requestOTPOrToken = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: 'Vui lòng nhập email!' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(404).json({ message: 'Email không tồn tại!' });
+        }
+
+        // Nếu chỉ có email => gửi OTP về email
+        if (!otp) {
+            const generatedOTP = generateOTP();
+            user.otp = generatedOTP;
+            // Thiết lập thời hạn OTP là 60 giây
+            user.otpExpiresAt = Date.now() + 60 * 1000;
+            user.otp_type = 'reset_password';
+            await user.save();
+
+            await sendOTPEmail(user.email, generatedOTP);
+            return res.status(200).json({ message: 'OTP đã được gửi đến email của bạn!' });
+        }
+
+        // Nếu có email và otp => kiểm tra OTP
+        if (otp !== user.otp || Date.now() > user.otpExpiresAt || user.otp_type !== 'reset_password') {
+            return res.status(401).json({ message: 'OTP không hợp lệ hoặc đã hết hạn.' });
+        }
+
+        // OTP hợp lệ, tạo token (ví dụ dùng JWT) và trả về
+        const token = jwt.sign(
+            { userId: user._id, email: user.email, otpPurpose: 'reset_password' },
+            process.env.JWT_SECRET,
+            { expiresIn: '10m' }  // Token có thời hạn ngắn, ví dụ 10 phút
+        );
+
+        // Reset lại các trường OTP sau khi sử dụng
+        user.otp = null;
+        user.otpExpiresAt = null;
+        user.otp_type = null;
+        await user.save();
+
+        return res.status(200).json({ message: 'Xác thực OTP thành công!', token });
+    } catch (error) {
+        return res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
+};
+
+exports.resetPasswordWithToken = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        if (!token || !newPassword) {
+            return res.status(400).json({ message: 'Vui lòng nhập đầy đủ token và mật khẩu mới!' });
+        }
+
+        // Xác minh token
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (err) {
+            return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
+        }
+
+        // Kiểm tra mục đích của token (otpPurpose) để đảm bảo token được tạo cho reset password
+        if (decoded.otpPurpose !== 'reset_password') {
+            return res.status(401).json({ message: 'Token không hợp lệ cho thao tác đặt lại mật khẩu.' });
+        }
+
+        // Tìm user dựa vào email hoặc userId trong token
+        const user = await User.findOne({ _id: decoded.userId });
+        if (!user) {
+            return res.status(404).json({ message: 'Tài khoản không tồn tại!' });
+        }
+
+        // Hash mật khẩu mới và cập nhật vào user
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+
+        return res.status(200).json({ message: 'Mật khẩu đã được cập nhật thành công!' });
     } catch (error) {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
