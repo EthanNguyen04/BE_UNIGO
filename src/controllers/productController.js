@@ -3,6 +3,9 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const Product = require('../models/productModel');
 const Category = require('../models/categoryModel');
+const Order = require("../models/orderModel."); // Đường dẫn đến model Order
+const mongoose = require("mongoose");
+
 const User = require('../models/userModel');
 const multer = require('multer');
 
@@ -192,38 +195,41 @@ exports.getProductsByCategoryId = async (req, res) => {
 
 exports.getDeXuatProducts = async (req, res) => {
     try {
+        // Lấy tất cả sản phẩm đang bán
         const products = await Product.find({ status: 'dang_ban' });
 
-        const result = products
-            .map(product => {
-                const discountPercent = product.discount_price > 0 ? (product.price - product.discount_price) / product.price : 0;
-                let price, original_price, discount_price;
-                if (product.discount_price > 0) {
-                    price = product.discount_price;
-                    original_price = product.discount_price;
-                    discount_price = product.price;
-                } else {
-                    price = product.price;
-                    original_price = product.price;
-                    discount_price = 0;
-                }
-                return {
-                    id: product._id,
-                    link: product.image_urls.length > 0 ? product.image_urls[0] : '',
-                    name: product.name,
-                    original_price: original_price,
-                    discount_price: discount_price,
-                };
-            })
-            .sort((a, b) => b.discountPercent - a.discountPercent)
-            .slice(0, 20);
+        const result = products.map(product => {
+            // Tính giá gốc thấp nhất từ các variant
+            const lowestVariantPrice = product.variants.length > 0 
+                ? Math.min(...product.variants.map(v => v.price))
+                : 0;
+                
+            let original_price, discount_price;
+            if (product.discount > 0) {
+                original_price = lowestVariantPrice * (100 - product.discount) / 100;
+                discount_price = lowestVariantPrice;
+            } else {
+                original_price = lowestVariantPrice;
+                discount_price = 0;
+            }
+            return {
+                id: product._id,
+                link: product.image_urls.length > 0 ? product.image_urls[0] : '',
+                name: product.name,
+                original_price,
+                discount_price,
+            };
+        })
+        // Sắp xếp theo phần trăm giảm giá giảm dần
+        .sort((a, b) => a.original_price - b.original_price)
+        // Lấy 20 sản phẩm đầu tiên
+        .slice(0, 20);
 
         return res.status(200).json({ products: result });
     } catch (error) {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
-
 
 
 
@@ -231,26 +237,94 @@ exports.getDeXuatProducts = async (req, res) => {
 
 exports.getSaleProducts = async (req, res) => {
     try {
+        // Lấy tối đa 10 sản phẩm có trạng thái 'dang_ban' và có discount > 0
         const products = await Product.aggregate([
-            { $match: { status: 'dang_ban', discount_price: { $gt: 0 } } },
+            { $match: { status: 'dang_ban', discount: { $gt: 0 } } },
             { $limit: 10 }
         ]);
 
         const result = products.map(product => {
-            const discountPercent = product.discount_price > 0 ? Math.max(Math.ceil((1 - product.discount_price / product.price) * 100), 1) : 0;
-            const salePrice = product.discount_price > 0 ? product.discount_price : product.price;
+            // Tính giá gốc thấp nhất từ các variant
+            const lowestVariantPrice = product.variants && product.variants.length > 0 
+                ? Math.min(...product.variants.map(v => v.price))
+                : 0;
+            let original_price, discount_price;
+            if (product.discount > 0) {
+                // original_price là giá sau giảm, discount_price là giá gốc
+                original_price = lowestVariantPrice * (100 - product.discount) / 100;
+                discount_price = lowestVariantPrice;
+            } else {
+                original_price = lowestVariantPrice;
+                discount_price = 0;
+            }
             return {
                 id: product._id,
+                link: product.image_urls && product.image_urls.length > 0 ? product.image_urls[0] : '',
                 name: product.name,
-                price: product.price,
-                sale_price: salePrice,
-                discount_percent: discountPercent > 100 ? 100 : discountPercent,
-                link: product.image_urls.length > 0 ? product.image_urls[0] : ''
+                original_price: original_price,
+                discount_price: discount_price,
+                discount: product.discount
             };
         });
+
+        // Sắp xếp giảm dần theo phần trăm giảm (discount)
+        result.sort((a, b) => b.discount - a.discount);
 
         return res.status(200).json({ products: result });
     } catch (error) {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
+
+
+//lấy chi tiết 1 sản phẩm
+
+exports.getProduct = async (req, res) => {
+    try {
+      const productId = req.params.id;
+  
+      // Tìm sản phẩm theo id
+      const product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Sản phẩm không tồn tại!" });
+      }
+  
+      // Tính tổng số lượng đã bán dựa vào tất cả các variant trong các đơn hàng có sản phẩm này
+      const orderAggregation = await Order.aggregate([
+        { $unwind: "$products" },
+        { $match: { "products.product_id": new mongoose.Types.ObjectId(productId) } },
+        { $unwind: "$products.variants" },
+        { $group: { _id: null, totalSold: { $sum: "$products.variants.quantity" } } }
+      ]);
+  
+      const totalSold = orderAggregation.length > 0 ? orderAggregation[0].totalSold : 0;
+  
+      // Tính tổng số lượng tồn kho của tất cả các variants
+      const totalQuantity = product.variants.reduce((acc, variant) => acc + variant.quantity, 0);
+  
+      // Xử lý variants, áp dụng discount vào giá từng variant
+      const variants = product.variants.map(variant => {
+        const discountedPrice = variant.price * (1 - product.discount / 100); // Áp dụng phần trăm giảm giá
+        return {
+          price: discountedPrice,
+          quantity: variant.quantity,
+          size: variant.size,
+          color: variant.color
+        };
+      });
+  
+      return res.json({
+        id: product._id,
+        images: product.image_urls,
+        name: product.name,
+        salePrice: variants[0]?.price, // Lấy giá giảm (nếu có), nếu không lấy giá gốc
+        discountPrice: product.variants[0]?.price, // Giá sau khi giảm
+        quantity: totalQuantity,  // Tổng số lượng tồn kho của tất cả variants
+        sold: totalSold,
+        description: product.description,
+        variants: variants
+      });
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  };

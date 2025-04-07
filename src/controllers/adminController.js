@@ -28,7 +28,7 @@ function generateOTP() {
 
 //     await transporter.sendMail(mailOptions);
 // }
-async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài khoản', customText = '', logoUrl = '') {
+async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài khoản Quản Trị', customText = '', logoUrl = '') {
     try {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
@@ -177,5 +177,9 @@ const adminController = {
     }
 };
 
-adminController.adminLogout = adminLogout;
-module.exports = adminController;
+
+
+  
+  adminController.adminLogout = adminLogout;
+  module.exports = adminController;
+  

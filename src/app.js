@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 const connectDB = require("./config/db");
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use(cors());
 app.use('/images', express.static(path.join(__dirname, 'public', 'images')));
 app.use('/public', express.static(path.join(__dirname, 'public')));
+app.use(cookieParser());
 
 // Kết nối MongoDB
 connectDB();
