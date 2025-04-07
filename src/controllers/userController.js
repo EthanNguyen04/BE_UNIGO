@@ -186,8 +186,8 @@ exports.createUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
     try {
         let { email, password, otp, token } = req.body;
-        email = email.toLowerCase();
-
+        
+        // Nếu token được gửi, xác thực token và trả về kết quả
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -197,9 +197,12 @@ exports.loginUser = async (req, res) => {
             }
         }
 
+        // Nếu không có token, yêu cầu email và mật khẩu phải được cung cấp
         if (!email || !password) {
             return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu!' });
         }
+        
+        email = email.toLowerCase();
 
         const user = await User.findOne({ email });
         if (!user) {
@@ -241,6 +244,7 @@ exports.loginUser = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
+
 
 exports.requestOTPOrToken = async (req, res) => {
     try {
