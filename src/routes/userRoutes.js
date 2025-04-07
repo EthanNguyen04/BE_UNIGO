@@ -14,7 +14,6 @@ router.post("/set_newpass", userController.resetPasswordWithToken);
 
 
 router.post("/login_admin", adminController.adminLogin); 
-router.post("/login_adminToken", adminController.adminLoginToken); 
 
 
 router.post("/logout_admin", adminController.adminLogout); 
