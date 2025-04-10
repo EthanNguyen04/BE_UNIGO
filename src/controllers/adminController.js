@@ -28,7 +28,7 @@ function generateOTP() {
 
 //     await transporter.sendMail(mailOptions);
 // }
-async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài khoản Quản Trị', customText = '', logoUrl = '') {
+async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài khoản quản trị', customText = '', logoUrl = '') {
     try {
         const transporter = nodemailer.createTransport({
             service: 'gmail',
@@ -80,14 +80,16 @@ async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài kho�
 // Hàm đăng xuất Admin
 const adminLogout = async (req, res) => {
     try {
-        const { token } = req.body;
+        const token = req.headers['authorization'];
 
         if (!token) {
             return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
         }
 
         try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            // Loại bỏ tiền tố "Bearer " nếu có
+            const actualToken = token.startsWith('Bearer ') ? token.slice(7) : token;
+            const decoded = jwt.verify(actualToken, process.env.JWT_SECRET);
             const user = await User.findById(decoded.userId);
 
             if (!user) {
@@ -98,9 +100,9 @@ const adminLogout = async (req, res) => {
                 user.invalidTokens = [];
             }
 
-            user.invalidTokens.push(token);
+            user.invalidTokens.push(actualToken);
             await user.save();
-
+            console.log("đăng xuất")
             return res.status(200).json({ message: 'Đăng xuất admin thành công!' });
         } catch (err) {
             return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
@@ -109,27 +111,33 @@ const adminLogout = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
+// Hàm đăng nhập Admin
 
 const adminController = {
     async adminLogin(req, res) {
         try {
-            let { email, password, otp } = req.body || {};
-            if (email && typeof email === 'string') {
-                email = email.toLowerCase(); // Chuyển email thành chữ thường
-            }
+            
             let token = req.headers.authorization;
 
             if (token && token.startsWith('Bearer ')) {
                 token = token.split(' ')[1];
                 try {
                     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                    return res.status(200).json({ message: 'Đăng nhập thành công', token });
+                    // Lấy thông tin người dùng từ database dựa vào decoded.userId
+                    const user = await User.findById(decoded.userId);
+                    if (!user) {
+                        return res.status(404).json({ message: "Không tìm thấy người dùng." });
+                    }
+                    return res.status(200).json({ message: 'Đăng nhập thành công', token, fullname: user.full_name  });
                 } catch (err) {
                     return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
                 }
             }
-
-            if (!email || !password) {
+            let { email, otp } = req.body || {};
+            if (email && typeof email === 'string') {
+                email = email.toLowerCase(); // Chuyển email thành chữ thường
+            }
+            if (!email) {
                 return res.status(400).json({ message: 'Vui lòng cung cấp email và mật khẩu.' });
             }
 
@@ -140,11 +148,6 @@ const adminController = {
 
             if (user.role !== 'admin') {
                 return res.status(403).json({ message: 'Truy cập bị từ chối. Không phải là quản trị viên.' });
-            }
-
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
-                return res.status(401).json({ message: 'Thông tin đăng nhập không chính xác.' });
             }
 
             if (!otp) {
@@ -163,23 +166,19 @@ const adminController = {
             const newToken = jwt.sign(
                 { userId: user._id, role: user.role },
                 process.env.JWT_SECRET,
-                { expiresIn: '10h' }
+                { expiresIn: '7d' }
             );
 
             user.otp = null;
             user.otpExpiresAt = null;
             await user.save();
 
-            return res.status(200).json({ message: 'Đăng nhập thành công', token: newToken });
+            return res.status(200).json({ message: 'Đăng nhập thành công', token: newToken, fullname: user.full_name });
         } catch (error) {
             return res.status(500).json({ message: 'Lỗi máy chủ', error: error.message });
         }
     }
 };
-
-
-
   
-  adminController.adminLogout = adminLogout;
-  module.exports = adminController;
-  
+adminController.adminLogout = adminLogout;
+module.exports = adminController;
