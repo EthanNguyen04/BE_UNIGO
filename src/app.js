@@ -19,8 +19,12 @@ connectDB();
 
 // Định tuyến API
 app.use("/api/user", require("./routes/userRoutes"));
-app.use("/api/admin", require("./routes/categoryRouters"));
+app.use("/api/category", require("./routes/categoryRouters"));
 app.use("/api/product", require("./routes/productRouter"));
+app.use("/api/cart", require("./routes/cartRouters"));
+app.use("/api/wishlist", require("./routes/wishList"));
+
+
 
 
 // Định tuyến ADMIN

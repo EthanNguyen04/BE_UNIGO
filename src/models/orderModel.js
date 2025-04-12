@@ -68,8 +68,8 @@ const orderSchema = new mongoose.Schema({
     // Trạng thái đơn hàng
     order_status: {
         type: String,
-        enum: ['Chờ xác nhận', 'Chờ lấy hàng', 'Đang giao hàng', 'Đã giao hàng', 'Hủy'],
-        default: 'Chờ xác nhận'
+        enum: ['cho_xac_nhan', 'cho_lay_hang', 'dang_giao', 'da_giao', 'huy'],
+        default: 'cho_xac_nhan'
     },
     // Lí do hủy đơn hàng (chỉ có khi order_status là "Hủy")
     cancellation_reason: { 
