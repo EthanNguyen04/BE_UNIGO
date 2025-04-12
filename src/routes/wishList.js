@@ -3,6 +3,7 @@ const wishListController = require("../controllers/wishListController"); // Kiá»
 
 const router = express.Router();
 
-router.post('/wishlist/add', wishListController.toggleWishlist);
+router.post('/change_like', wishListController.toggleWishlist);
 
-router.post('/wishlist/check', wishListController.checkIfProductInWishlist);
+router.post('/check_like', wishListController.checkIfProductInWishlist);
+module.exports = router;

@@ -2,6 +2,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const User = require('../models/userModel');
+const Order = require('../models/orderModel');
+const Wishlist = require('../models/wishListModel');
 const path = require('path');
 
 // Hàm tạo OTP ngẫu nhiên
@@ -111,41 +113,6 @@ exports.userLogout = async (req, res) => {
     }
 };
 
-
-// Hàm lấy thông tin người dùng từ token
-exports.getUserInfo = async (req, res) => {
-    try {
-        const token = req.headers['authorization'];
-
-        if (!token) {
-            return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
-        }
-
-        try {
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            const user = await User.findById(decoded.userId);
-            if (!user) {
-                return res.status(404).json({ message: 'Người dùng không tồn tại!' });
-            }
-
-            return res.status(200).json({
-                message: 'Thông tin người dùng',
-                user: {
-                    id: user._id,
-                    email: user.email,
-                    full_name: user.full_name,
-                    role: user.role,
-                    avatar_url: user.avatar_url,
-                    account_status: user.account_status
-                }
-            });
-        } catch (err) {
-            return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
-        }
-    } catch (error) {
-        return res.status(500).json({ message: 'Lỗi server', error: error.message });
-    }
-};
 
 exports.createUser = async (req, res) => {
     try {
@@ -331,3 +298,53 @@ exports.resetPasswordWithToken = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
+
+
+
+//hàm để lấy tên, ảnh, số mua, số thích
+// Hàm này sẽ lấy thông tin của người dùng theo token gửi lên trong header
+exports.getInfoUser = async (req, res) => {
+    try {
+      // Lấy token từ header: format "Bearer <token>"
+      const authHeader = req.headers['authorization'];
+      if (!authHeader) {
+        return res.status(401).json({ error: 'No token provided' });
+      }
+      
+      const token = authHeader.split(' ')[1];
+      if (!token) {
+        return res.status(401).json({ error: 'Invalid token format' });
+      }
+      
+      // Giải mã token để lấy thông tin người dùng, sử dụng key là "userId" theo token được tạo lúc đăng nhập
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId;  // Sử dụng trường userId thay vì id
+  
+      // Lấy thông tin người dùng: tên (full_name) và avatar_url
+      const user = await User.findById(userId).select('full_name avatar_url');
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      // Đếm số sản phẩm có trong Wishlist của người dùng
+      const wishlist = await Wishlist.findOne({ user_id: userId });
+      const wishlistCount = wishlist ? wishlist.product_ids.length : 0;
+  
+      // Đếm số đơn hàng của người dùng
+      const orderCount = await Order.countDocuments({ user_id: userId });
+  
+      // Trả về dữ liệu theo định dạng
+      return res.json({
+        name: user.full_name,
+        avatar_url: user.avatar_url,
+        wishlist_count: wishlistCount,
+        order_count: orderCount
+      });
+    } catch (error) {
+      console.error('Error in getInfoUser:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  };
+
+
+  

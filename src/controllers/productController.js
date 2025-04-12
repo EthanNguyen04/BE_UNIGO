@@ -4,10 +4,15 @@ const jwt = require('jsonwebtoken');
 const Product = require('../models/productModel');
 const Category = require('../models/categoryModel');
 const Order = require("../models/orderModel"); // Đường dẫn đến model Order
+
 const mongoose = require("mongoose");
 
 const User = require('../models/userModel');
 const multer = require('multer');
+// Sử dụng hàm getFuseInstance từ file config
+const { getFuseInstance } = require('../config/fuse');
+// ...
+//const fuse = getFuseInstance(processedProducts);
 
 // Cấu hình Multer dùng bộ nhớ tạm, chúng ta sẽ tự xử lý việc lưu
 const storage = multer.memoryStorage();
@@ -251,65 +256,172 @@ exports.getProduct = async (req, res) => {
   };
 
  // lấy sản phẩm theo tên, giá (sắp xếp từ cao xuống thấp) và phân loại (category)
-  exports.getFilteredProducts = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = 20;
-        const skip = (page - 1) * limit;
-
-        const { name, category, sortByPrice } = req.query; // Lấy các tham số từ query string
-
-        // Lấy toàn bộ category có status true
-        const activeCategories = await Category.find({ status: true }).lean();
-        const activeCategoryIds = activeCategories.map(cat => cat._id.toString());
-
-        // Xây dựng điều kiện tìm kiếm
-        const filterConditions = { status: "dang_ban", category_id: { $in: activeCategoryIds } };
-
-        if (name) {
-            filterConditions.name = { $regex: name, $options: 'i' }; // Tìm kiếm tên sản phẩm
-        }
-        if (category) {
-            filterConditions.category_id = category; // Lọc theo category nếu có
-        }
-
-        // Truy vấn sản phẩm theo điều kiện
-        const products = await Product.find(filterConditions)
-            .skip(skip)
-            .limit(limit)
-            .lean();
-
-        // Lấy tên category và tính giá theo variants thấp nhất * giảm giá
-        const filteredProducts = products.map(prod => {
-            const category = activeCategories.find(c => c._id.toString() === prod.category_id?.toString());
-            const lowestPrice = Math.min(...prod.variants.map(v => v.price)); // Giá thấp nhất trong variants
-            const priceAfterDiscount = lowestPrice * (1 - prod.discount / 100); // Tính giá sau giảm giá
-
-            return {
-                ...prod,
-                category_name: category?.name || null,
-                price_after_discount: priceAfterDiscount.toFixed(2), // Giá đã giảm
-                saled: 3000 // Thêm thông tin bán được (có thể thay đổi theo yêu cầu)
-            };
-        });
-
-        // Sắp xếp theo giá nếu sortByPrice có giá trị
-        if (sortByPrice === 'desc') {
-            filteredProducts.sort((a, b) => b.price_after_discount - a.price_after_discount); // Sắp xếp từ cao xuống thấp
-        }
-
-        // Đếm tổng số sản phẩm phù hợp
-        const totalCount = filteredProducts.length;
-
-        return res.status(200).json({
-            message: 'Lấy danh sách sản phẩm thành công!',
-            page,
-            perPage: limit,
-            totalPages: Math.ceil(totalCount / limit),
-            totalCount,
-            products: filteredProducts
-        });
-    } catch (error) {
-        return res.status(500).json({ message: 'Lỗi máy chủ', error: error.message });
+ // Hàm tìm kiếm sản phẩm theo tên gần đúng, có thể lọc theo danh mục (idCategory) và sắp xếp giá
+ /**
+ * Hàm loại bỏ dấu tiếng Việt
+ * @param {string} str - Chuỗi cần chuẩn hóa
+ * @returns {string} - Chuỗi không dấu
+ */
+function removeDiacritics(str) {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  
+  /**
+ * Hàm loại bỏ dấu tiếng Việt (chuyển sang dạng không dấu)
+ * @param {string} str - Chuỗi cần chuẩn hóa
+ * @returns {string} - Chuỗi không dấu
+ */
+function removeDiacritics(str) {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+  
+  /**
+   * Hàm tính giá của sản phẩm dựa trên các variants và discount.
+   * @param {object} product - Đối tượng sản phẩm
+   * @returns {object} - Chứa các trường original_price và discount_price
+   */
+  function calculatePrices(product) {
+    const lowestVariantPrice = (product.variants && product.variants.length > 0)
+      ? Math.min(...product.variants.map(v => v.price))
+      : 0;
+    let original_price, discount_price;
+    if (product.discount > 0) {
+      original_price = lowestVariantPrice * (100 - product.discount) / 100;
+      discount_price = lowestVariantPrice;
+    } else {
+      original_price = lowestVariantPrice;
+      discount_price = 0;
     }
-};
+    return { original_price, discount_price };
+  }
+  
+  /**
+   * Hàm tìm kiếm sản phẩm theo tên gần đúng, có lọc theo danh mục và sắp xếp giá.
+   * Nếu từ khóa tìm kiếm rỗng hoặc không truyền thì trả về toàn bộ kết quả theo filter mặc định.
+   */
+  exports.searchProducts = async (req, res) => {
+    try {
+      const page = parseInt(req.query.page) || 1;
+      const limit = 20;
+      const skip = (page - 1) * limit;
+      const { name, idCategory, sortByPrice } = req.query;
+      
+      // Loại bỏ khoảng trắng thừa nếu có
+      const trimmedName = name ? name.trim() : "";
+  
+      let filterConditions = { status: "dang_ban" };
+      if (idCategory) {
+        filterConditions.category_id = idCategory;
+      }
+  
+      let products = [];
+  
+      if (trimmedName) {
+        // Nếu có từ khóa, lấy toàn bộ sản phẩm thoả filter cơ bản (không phân trang ngay lúc này)
+        const allProducts = await Product.find(filterConditions).lean();
+  
+        // Thêm trường nameNormalized cho mỗi sản phẩm (chuẩn hóa về không dấu và chữ thường)
+        const processedProducts = allProducts.map(product => ({
+          ...product,
+          nameNormalized: removeDiacritics(product.name.toLowerCase())
+        }));
+  
+        // Chuẩn hóa từ khóa tìm kiếm
+        const normalizedQuery = removeDiacritics(trimmedName.toLowerCase());
+  
+        // Cấu hình Fuse.js để hỗ trợ fuzzy search, bao gồm score
+        const fuseOptions = { keys: ['nameNormalized'], threshold: 0.6, includeScore: true };
+        const fuse = getFuseInstance(processedProducts, fuseOptions);
+        const fuzzyResults = fuse.search(normalizedQuery);
+  
+        // Tính toán giá cho từng kết quả
+        const computedResults = fuzzyResults.map(result => {
+          const { original_price, discount_price } = calculatePrices(result.item);
+          return {
+            item: result.item,
+            score: result.score, // score càng thấp thì mức tương đồng càng cao
+            original_price,
+            discount_price,
+            discount: result.item.discount
+          };
+        });
+        
+        // Nếu muốn kết hợp ưu tiên theo giá khi hai kết quả có score gần nhau, định nghĩa epsilon:
+        const epsilon = 0.05;
+        computedResults.sort((a, b) => {
+          const scoreDiff = a.score - b.score;
+          if (Math.abs(scoreDiff) < epsilon && sortByPrice) {
+            if (sortByPrice.toLowerCase() === 'desc') {
+              return b.original_price - a.original_price;
+            } else { // 'asc' //"asc" viết tắt của "ascending", có nghĩa là tăng dần (sắp xếp từ giá thấp nhất đến cao nhất), còn "desc" (descending) có nghĩa là giảm dần (sắp xếp từ giá cao nhất đến thấp nhất).
+              return a.original_price - b.original_price;
+            }
+          }
+          return scoreDiff;
+        });
+        
+        products = computedResults.map(result => ({
+          ...result.item,
+          original_price: result.original_price,
+          discount_price: result.discount_price,
+          discount: result.discount
+        }));
+      } else {
+        // Nếu từ khóa rỗng thì truy vấn trực tiếp với phân trang
+        products = await Product.find(filterConditions)
+                          .skip(skip)
+                          .limit(limit)
+                          .lean();
+        // Tính giá cho mỗi sản phẩm trong trường hợp không dùng fuzzy
+        products = products.map(product => {
+          const { original_price, discount_price } = calculatePrices(product);
+          return {
+            ...product,
+            original_price,
+            discount_price,
+            discount: product.discount
+          };
+        });
+      }
+  
+      // Nếu có sortByPrice và không dùng fuzzy (không có tên) thì sắp xếp theo giá trực tiếp
+      if (!trimmedName && sortByPrice) {
+        products.sort((a, b) => {
+          const priceA = calculatePrices(a).original_price;
+          const priceB = calculatePrices(b).original_price;
+          if (sortByPrice.toLowerCase() === 'desc') {
+            return priceB - priceA;
+          }
+          return priceA - priceB;
+        });
+      }
+  
+      // Đảm bảo kết quả trả về bao gồm các trường như yêu cầu
+      const result = products.map(product => {
+        return {
+          id: product._id,
+          link: (product.image_urls && product.image_urls.length > 0) ? product.image_urls[0] : '',
+          name: product.name,
+          original_price: product.original_price,
+          discount_price: product.discount_price,
+          discount: product.discount
+        };
+      });
+  
+      // Phân trang kết quả trên mảng
+      const totalCount = result.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      const paginatedResult = result.slice(skip, skip + limit);
+  
+      return res.status(200).json({
+        message: "Lấy danh sách sản phẩm thành công!",
+        page,
+        perPage: limit,
+        totalPages,
+        totalCount,
+        products: paginatedResult
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
+    }
+  };
