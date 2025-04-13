@@ -8,6 +8,8 @@ router.get('/products/:id', productController.getProductsByCategoryId);
 
 router.get('/products_dx', productController.getDeXuatProducts);
 router.get('/products_sale', productController.getSaleProducts);
+router.get('/allproducts_sale', productController.getAllSaleProducts);
+
 
 
 router.get('/searchProducts', productController.searchProducts);

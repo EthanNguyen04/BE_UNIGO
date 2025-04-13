@@ -201,7 +201,45 @@ exports.getSaleProducts = async (req, res) => {
         return res.status(500).json({ message: 'Lỗi server', error: error.message });
     }
 };
+exports.getAllSaleProducts = async (req, res) => {
+  try {
+      // Lấy tối đa 10 sản phẩm có trạng thái 'dang_ban' và có discount > 0
+      const products = await Product.aggregate([
+          { $match: { status: 'dang_ban', discount: { $gt: 0 } } },
+      ]);
 
+      const result = products.map(product => {
+          // Tính giá gốc thấp nhất từ các variant
+          const lowestVariantPrice = product.variants && product.variants.length > 0 
+              ? Math.min(...product.variants.map(v => v.price))
+              : 0;
+          let original_price, discount_price;
+          if (product.discount > 0) {
+              // original_price là giá sau giảm, discount_price là giá gốc
+              original_price = lowestVariantPrice * (100 - product.discount) / 100;
+              discount_price = lowestVariantPrice;
+          } else {
+              original_price = lowestVariantPrice;
+              discount_price = 0;
+          }
+          return {
+              id: product._id,
+              link: product.image_urls && product.image_urls.length > 0 ? product.image_urls[0] : '',
+              name: product.name,
+              original_price: original_price,
+              discount_price: discount_price,
+              discount: product.discount
+          };
+      });
+
+      // Sắp xếp giảm dần theo phần trăm giảm (discount)
+      result.sort((a, b) => b.discount - a.discount);
+
+      return res.status(200).json({ products: result });
+  } catch (error) {
+      return res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+};
 
 //lấy chi tiết 1 sản phẩm
 
@@ -425,3 +463,7 @@ function removeDiacritics(str) {
       return res.status(500).json({ message: "Lỗi máy chủ", error: error.message });
     }
   };
+
+
+
+

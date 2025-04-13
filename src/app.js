@@ -18,6 +18,9 @@ app.use(cookieParser());
 connectDB();
 
 // Định tuyến API
+app.use("/api/noti", require("./routes/notificationRouter"));
+
+
 app.use("/api/user", require("./routes/userRoutes"));
 app.use("/api/category", require("./routes/categoryRouters"));
 app.use("/api/product", require("./routes/productRouter"));

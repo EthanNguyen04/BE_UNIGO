@@ -3,72 +3,88 @@ const Cart = require('../models/cartModel'); // Điều chỉnh đường dẫn 
 
 // Controller thêm mới hoặc cập nhật cart
 exports.createOrUpdateCart = async (req, res) => {
+  try {
+    const { product_id, size, color, quantity } = req.body;
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !product_id) {
+      return res.status(400).json({ error: 'Token và product_id là bắt buộc' });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(400).json({ error: 'Token không hợp lệ' });
+    }
+    
+    const quantityValue = quantity && quantity >= 1 ? quantity : 1;
+    
+    let decoded;
     try {
-      const { product_id, size, color, quantity } = req.body;
-      const authHeader = req.headers.authorization;
-      
-      if (!authHeader || !product_id) {
-        return res.status(400).json({ error: 'Token và product_id là bắt buộc' });
-      }
-      
-      const token = authHeader.split(' ')[1];
-      if (!token) {
-        return res.status(400).json({ error: 'Token không hợp lệ' });
-      }
-      
-      const quantityValue = quantity && quantity >= 1 ? quantity : 1;
-      
-      let decoded;
-      try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-      } catch (error) {
-        return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn' });
-      }
-      
-      // Debug: hiển thị payload của token để kiểm tra thuộc tính chứa user id
-      console.log('Decoded token payload:', decoded);
-      
-      // Sử dụng decoded.id thay vì decoded._id nếu token payload chứa id
-      const userId = decoded.userId;
-      if (!userId) {
-        return res.status(400).json({ error: 'Không lấy được thông tin user từ token' });
-      }
-      
-      let cart = await Cart.findOne({ user_id: userId });
-      
-      if (cart) {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn' });
+    }
+    
+    // Sử dụng decoded.id thay vì decoded._id nếu token payload chứa id
+    const userId = decoded.userId;
+    if (!userId) {
+      return res.status(400).json({ error: 'Không lấy được thông tin user từ token' });
+    }
+    
+    // Tìm giỏ hàng của người dùng
+    let cart = await Cart.findOne({ user_id: userId });
+
+    if (cart) {
+      // Kiểm tra nếu sản phẩm đã có trong giỏ hàng với cùng product_id, size và color
+      const existingProductIndex = cart.products.findIndex(
+        (product) =>
+          product.product_id.toString() === product_id &&
+          product.size === size &&
+          product.color === color
+      );
+
+      if (existingProductIndex !== -1) {
+        // Nếu có, chỉ cập nhật số lượng
+        cart.products[existingProductIndex].quantity += quantityValue;
+      } else {
+        // Nếu không có, thêm mới sản phẩm vào giỏ hàng
         cart.products.push({
           product_id,
           color: color || null,
           size: size || null,
           quantity: quantityValue,
         });
-        await cart.save();
-        return res.status(200).json({
-          message: 'Cập nhật cart thành công - sản phẩm mới đã được thêm vào',
-          cart,
-        });
-      } else {
-        cart = new Cart({
-          user_id: userId,
-          products: [{
-            product_id,
-            color: color || null,
-            size: size || null,
-            quantity: quantityValue,
-          }]
-        });
-        await cart.save();
-        return res.status(201).json({
-          message: 'Tạo cart mới thành công',
-          cart,
-        });
       }
-    } catch (err) {
-      console.error('Lỗi khi xử lý cart:', err);
-      return res.status(500).json({ error: 'Lỗi server' });
+      
+      // Lưu lại giỏ hàng sau khi cập nhật
+      await cart.save();
+      return res.status(200).json({
+        message: 'Cập nhật cart thành công',
+        cart,
+      });
+    } else {
+      // Nếu giỏ hàng chưa tồn tại, tạo mới giỏ hàng
+      cart = new Cart({
+        user_id: userId,
+        products: [{
+          product_id,
+          color: color || null,
+          size: size || null,
+          quantity: quantityValue,
+        }]
+      });
+      await cart.save();
+      return res.status(201).json({
+        message: 'Tạo cart mới thành công',
+        cart,
+      });
     }
-  };
+  } catch (err) {
+    console.error('Lỗi khi xử lý cart:', err);
+    return res.status(500).json({ error: 'Lỗi server' });
+  }
+};
+
 
   // Controller lấy danh sách product của user dựa trên token gửi từ header
 // Controller GET danh sách sản phẩm trong cart của user dựa trên token gửi ở header Authorization
