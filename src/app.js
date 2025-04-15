@@ -26,6 +26,7 @@ app.use("/api/category", require("./routes/categoryRouters"));
 app.use("/api/product", require("./routes/productRouter"));
 app.use("/api/cart", require("./routes/cartRouters"));
 app.use("/api/wishlist", require("./routes/wishList"));
+app.use("/api/order", require("./routes/oderRouters"));
 
 
 

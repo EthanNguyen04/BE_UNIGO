@@ -68,7 +68,7 @@ const orderSchema = new mongoose.Schema({
     // Trạng thái đơn hàng
     order_status: {
         type: String,
-        enum: ['cho_xac_nhan', 'cho_lay_hang', 'dang_giao', 'da_giao', 'huy'],
+        enum: ['cho_xac_nhan', 'cho_lay_hang', 'dang_giao', 'da_giao','hoan_thanh', 'huy'],
         default: 'cho_xac_nhan'
     },
     // Lí do hủy đơn hàng (chỉ có khi order_status là "Hủy")

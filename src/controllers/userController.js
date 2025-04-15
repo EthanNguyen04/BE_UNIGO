@@ -346,5 +346,198 @@ exports.getInfoUser = async (req, res) => {
     }
   };
 
+  
+exports.getUserProfile = async (req, res) => {
+    try {
+      // Lấy token từ header Authorization
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: "Không tìm thấy token" });
+      }
+      const token = authHeader.split(' ')[1];
+      
+      // Giải mã token để lấy userId
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId;
+      
+      // Tìm người dùng dựa trên userId, chỉ lấy các trường avatar_url, full_name, email
+      const user = await User.findById(userId).select('avatar_url full_name email');
+      if (!user) {
+        return res.status(404).json({ message: "Người dùng không tồn tại" });
+      }
+      
+      // Trả về thông tin người dùng cần lấy
+      return res.status(200).json({
+        avatar: user.avatar_url,
+        name: user.full_name,
+        email: user.email
+      });
+    } catch (error) {
+      console.error("Lỗi khi lấy thông tin người dùng:", error);
+      return res.status(500).json({ message: "Có lỗi xảy ra, vui lòng thử lại sau" });
+    }
+  };
 
+
+  // Controller PUT update thông tin người dùng
+  exports.updateUserProfile = async (req, res) => {
+    try {
+      // Lấy token từ header Authorization dạng "Bearer token"
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: "Không có token, truy cập không được phép" });
+      }
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token không hợp lệ" });
+      }
+  
+      // Giải mã token để lấy userId (giả sử payload chứa field "userId")
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Không xác thực được người dùng" });
+      }
+  
+      // Tìm user theo userId
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+  
+      // Cập nhật tên nếu có
+      if (req.body.full_name) {
+        user.full_name = req.body.full_name;
+      }
+  
+      // Cập nhật mật khẩu: nếu người dùng muốn đổi mật khẩu phải gửi kèm currentPassword và newPassword
+      if (req.body.newPassword) {
+        if (!req.body.currentPassword) {
+          return res.status(400).json({ message: "Yêu cầu nhập mật khẩu hiện tại để thay đổi mật khẩu" });
+        }
+        // Kiểm tra mật khẩu hiện tại có khớp không
+        const isMatch = await bcrypt.compare(req.body.currentPassword, user.password);
+        if (!isMatch) {
+          return res.status(400).json({ message: "Mật khẩu hiện tại không chính xác" });
+        }
+        // Mã hoá mật khẩu mới và cập nhật
+        const hashedPassword = await bcrypt.hash(req.body.newPassword, 10);
+        user.password = hashedPassword;
+      }
+  
+      // Cập nhật ảnh đại diện: nếu có file upload được xử lý bởi multer
+      if (req.file) {
+        user.avatar_url = `/public/user/${req.file.filename}`;
+      }
+  
+      // Lưu các thay đổi
+      await user.save();
+      return res.status(200).json({ message: "Cập nhật thông tin thành công" });
+    } catch (error) {
+      console.error("Lỗi update profile:", error);
+      return res.status(500).json({ message: "Lỗi server, vui lòng thử lại sau" });
+    }
+  };
+
+  // Controller GET lấy tất cả các địa chỉ của người dùng
+exports.getAllAddresses = async (req, res) => {
+    try {
+      // Lấy token từ header Authorization (dạng "Bearer token")
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: "Không có token, truy cập không được phép" });
+      }
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token không hợp lệ" });
+      }
+  
+      // Giải mã token để lấy userId (giả sử payload chứa field "userId" hoặc "id")
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "Không xác thực được người dùng" });
+      }
+  
+      // Tìm user theo userId, chỉ select trường addresses để tối ưu truy vấn
+      const user = await User.findById(userId).select("addresses");
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+  
+      // Trả về danh sách địa chỉ
+      return res.status(200).json({ addresses: user.addresses });
+    } catch (error) {
+      console.error("Lỗi getAllAddresses:", error);
+      return res.status(500).json({ message: "Lỗi server, vui lòng thử lại sau" });
+    }
+  };
+
+
+
+  // Controller thêm hoặc cập nhật địa chỉ người dùng theo token
+  exports.addOrUpdateAddress = async (req, res) => {
+    try {
+      // Lấy token từ header Authorization dạng "Bearer token"
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ message: "Không có token, truy cập không được phép" });
+      }
+      
+      const token = authHeader.split(" ")[1];
+      if (!token) {
+        return res.status(401).json({ message: "Token không hợp lệ" });
+      }
+      
+      // Giải mã token và lấy userId (giả sử payload chứa "userId" hoặc "id")
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.userId || decoded.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Không xác thực được người dùng" });
+      }
+      
+      // Lấy thông tin địa chỉ từ req.body
+      // oldAddress: địa chỉ cũ (để sửa nếu có), address: địa chỉ mới, phone: số điện thoại mới
+      const { oldAddress, address, phone } = req.body;
+      if (!address || !phone) {
+        return res.status(400).json({ message: "Yêu cầu nhập đầy đủ thông tin địa chỉ mới và số điện thoại" });
+      }
+      
+      // Tìm người dùng theo userId
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "Không tìm thấy người dùng" });
+      }
+      
+      // Nếu có oldAddress (không rỗng) thì tìm trong danh sách addresses để update
+      if (oldAddress && oldAddress.trim() !== "") {
+        let found = false;
+        // Duyệt qua các phần tử trong addresses để tìm địa chỉ cần sửa
+        user.addresses = user.addresses.map(item => {
+          if (item.address === oldAddress) {
+            found = true;
+            return { address, phone };
+          }
+          return item;
+        });
+        if (!found) {
+          // Nếu không tìm thấy địa chỉ cũ phù hợp, thông báo lỗi (hoặc có thể chọn thêm mới)
+          return res.status(404).json({ message: "Địa chỉ cũ không tồn tại, không thể cập nhật" });
+        }
+      } else {
+        // Nếu oldAddress trống hoặc không có thì thêm địa chỉ mới
+        user.addresses.push({ address, phone });
+      }
+      
+      // Lưu các thay đổi
+      await user.save();
+      return res.status(200).json({ 
+        message: "Cập nhật địa chỉ thành công", 
+        addresses: user.addresses 
+      });
+    } catch (error) {
+      console.error("Lỗi cập nhật địa chỉ:", error);
+      return res.status(500).json({ message: "Lỗi server, vui lòng thử lại sau" });
+    }
+  };
   
