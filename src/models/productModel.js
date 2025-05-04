@@ -48,7 +48,11 @@ const productSchema = new mongoose.Schema({
                 required: true 
             } // Màu sắc của phiên bản
         }
-    ]
+    ],
+    priceIn:{
+        type: Number,  // Giá nhập hàng
+        required: true 
+    }
 });
 
 

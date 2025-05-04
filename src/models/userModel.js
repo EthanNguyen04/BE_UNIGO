@@ -28,7 +28,8 @@ const userSchema = new mongoose.Schema({
     otp_verified: { type: Boolean, default: false },  // Thêm trạng thái OTP
     otp_type: { type: String, enum: ["login", "reset_password"], default: null },
     isActive: { type: Boolean, default: false },
-    created_at: { type: Date, default: Date.now }
+    created_at: { type: Date, default: Date.now },
+    expo_tkn: { type: String, default: "" }
 }); 
 
 module.exports = mongoose.model("User", userSchema);

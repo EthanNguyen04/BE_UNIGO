@@ -28,6 +28,7 @@ app.use("/api/cart", require("./routes/cartRouters"));
 app.use("/api/wishlist", require("./routes/wishList"));
 app.use("/api/order", require("./routes/oderRouters"));
 
+app.use("/api/discount", require("./routes/discountRouter"));
 
 
 

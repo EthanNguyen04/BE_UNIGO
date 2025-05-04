@@ -2,75 +2,7 @@ const jwt = require('jsonwebtoken');
 const Category = require('../models/categoryModel');
 const User = require('../models/userModel');
 
-// Tạo mới danh mục
-exports.createCategory = async (req, res) => {
-    try {
-        // Lấy token từ header
-        let token = req.headers.authorization;
-        if (token && token.startsWith('Bearer ')) {
-            token = token.split(' ')[1];
-        } else {
-            return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
-        }
-
-        // Lấy và xử lý tên danh mục
-        let { name } = req.body || '';
-        
-        // Kiểm tra tên danh mục không được để trống hoặc chỉ chứa khoảng trắng
-        if (!name || typeof name !== 'string' || name.trim().length === 0) {
-            return res.status(400).json({ message: 'Tên danh mục không được để trống hoặc chỉ chứa khoảng trắng!' });
-        }
-
-        // Chuyển tên danh mục về định dạng title case
-        if (name && typeof name === 'string') {
-            name = name
-                .trim()                         // Xoá khoảng trắng đầu cuối
-                .replace(/\s+/g, ' ')           // Loại bỏ khoảng trắng thừa giữa các từ
-                .toLowerCase()                  // Chuyển về chữ thường hết
-                .split(' ')                     // Tách từng từ
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Viết hoa chữ cái đầu
-                .join(' ');                     // Ghép lại thành chuỗi
-        }
-        console.log('Tên danh mục nhận được từ req.body:', name);
-
-        try {
-            // Xác thực token
-            console.log("Token nhận được:", token);
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log("Decoded token:", decoded);
-            console.log("User từ token:", decoded.userId);
-
-            const user = await User.findById(decoded.userId);
-            console.log("User tìm được:", user.role);
-
-
-            // Kiểm tra quyền admin
-            if (!user || user.role !== 'admin') {
-                return res.status(403).json({ message: 'Chỉ có admin mới có quyền tạo danh mục!' });
-            }
-
-            // Kiểm tra xem danh mục đã tồn tại chưa (không phân biệt hoa thường)
-            const existingCategory = await Category.findOne({ name: { $regex: new RegExp(`^${name}$`, 'i') } });
-            if (existingCategory) {
-                return res.status(400).json({ message: 'Danh mục đã tồn tại!' });
-            }
-            console.log("đến đây :", user.role);
-            // Tạo mới danh mục
-            const newCategory = new Category({ name });
-            console.log("đến đây 2 :", user.role);
-
-            await newCategory.save();
-            console.log("đến đây 3:", user.role);
-
-
-            return res.status(201).json({ message: 'Tạo danh mục thành công!', category: newCategory });
-        } catch (err) {
-            return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
-        }
-    } catch (error) {
-        return res.status(500).json({ message: 'Lỗi máy chủ', error: error.message });
-    }
-};
+const Product  = require('../models/productModel'); // hoặc đường dẫn tương ứng
 
 
 // Cập nhật tên danh mục theo ID (yêu cầu admin)
@@ -178,16 +110,30 @@ exports.toggleCategoryStatus = async (req, res) => {
 // Lấy tất cả danh mục đang hoạt động
 exports.getAllCategories = async (req, res) => {
     try {
-        const categories = await Category.find({ status: true });
-
-        return res.status(200).json({
-            message: 'Danh sách danh mục đang hoạt động',
-            categories
-        });
+      // 1. Lấy toàn bộ danh mục
+      const categories = await Category.find();
+  
+      // 2. Kiểm tra với Product để set status động
+      const updated = await Promise.all(categories.map(async cat => {
+        const hasProduct = await Product.exists({ category_id: cat._id });
+        // gán status mới (không lưu xuống DB, chỉ thay đổi object trả về)
+        const obj = cat.toObject();
+        obj.status = Boolean(hasProduct);
+        return obj;
+      }));
+  
+      // 3. Lọc chỉ lấy những danh mục đang hoạt động
+      const activeCategories = updated.filter(cat => cat.status);
+  
+      return res.status(200).json({
+        message: 'Danh sách danh mục đang hoạt động',
+        categories: activeCategories
+      });
     } catch (error) {
-        return res.status(500).json({
-            message: 'Lỗi máy chủ',
-            error: error.message
-        });
+      return res.status(500).json({
+        message: 'Lỗi máy chủ',
+        error: error.message
+      });
     }
-};
+  };
+  

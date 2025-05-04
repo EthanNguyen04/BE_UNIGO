@@ -7,78 +7,8 @@ const Notification = require('../models/notification'); // Import model User đ�
 const moment = require('moment'); // Import moment vào file
 
 
-// Controller để handle post request
-exports.saveExpoToken = async (req, res) => {
-    const { token } = req.headers;  // Lấy token từ header
-    const { extkn } = req.body;     // Lấy extkn từ body
-    
-    // Kiểm tra nếu không có body.extkn
-    if (!extkn) {
-        return res.status(400).json({ message: "Thiếu body.extkn" });
-    }
 
-    let userId = null;
-    let type = 'khach';  // Mặc định là 'khach'
-
-    // Kiểm tra nếu có token
-    if (token) {
-        try {
-            // Giải mã JWT token để lấy userId
-            const decoded = jwt.verify(token, process.env.JWT_SECRET); // Thay `JWT_SECRET` bằng secret key của bạn
-            userId = decoded.userId;
-
-            // Kiểm tra xem userId có phải là người dùng hợp lệ hay không
-            const user = await User.findById(userId);
-            if (user) {
-                type = 'user'; // Nếu là người dùng hợp lệ thì type là 'user'
-            } else {
-                type = 'khach'; // Nếu không phải user hợp lệ thì type vẫn là 'khach'
-            }
-        } catch (error) {
-            // Nếu có lỗi khi giải mã token
-            return res.status(500).json({ message: "Token không hợp lệ", error: error.message });
-        }
-    }
-
-    try {
-        // Kiểm tra xem có token extkn đã tồn tại trong DB hay không
-        let extknRecord = await Extkn.findOne({ expoToken: extkn });
-
-        if (extknRecord) {
-            // Nếu đã tồn tại, kiểm tra xem type có thay đổi không
-            if (extknRecord.type !== type) {
-                // Nếu type thay đổi, cập nhật lại
-                extknRecord.type = type;
-                await extknRecord.save();
-                return res.status(200).json({ type: type });
-            } else {
-                return res.status(200).json({ type: type  });
-            }
-        } else {
-            // Nếu chưa có extkn, tạo mới
-            const newExtkn = new Extkn({
-                expoToken: extkn,
-                userId: userId || null, // Nếu không có token thì userId có thể là null
-                type: type,
-            });
-
-            await newExtkn.save();
-            return res.status(201).json({ message: "Expo token saved successfully" });
-        }
-
-    } catch (error) {
-        // Nếu có lỗi trong quá trình lưu vào MongoDB
-        return res.status(500).json({ message: "Lỗi khi xử lý dữ liệu", error: error.message });
-    }
-};
-
-
-
-
-
-// Function để gửi thông báo đến Expo Push Notification API
-// Hàm gửi thông báo đẩy
-// Function để gửi thông báo đến Expo Push Notification API
+// Hàm gửi push notification
 const sendPushNotification = async (token, message, title) => {
   try {
     const response = await fetch('https://exp.host/--/api/v2/push/send', {
@@ -89,7 +19,7 @@ const sendPushNotification = async (token, message, title) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        to: token, // Token nhận thông báo
+        to: token,
         sound: 'default',
         title: title,
         body: message,
@@ -97,55 +27,82 @@ const sendPushNotification = async (token, message, title) => {
     });
 
     const data = await response.json();
-    return data; // Trả về dữ liệu phản hồi từ Expo API
+    return data;
   } catch (error) {
-    console.error('Error sending push notification:', error);
-    throw new Error('Không thể gửi thông báo đẩy');
+    console.error('❌ Error sending push notification:', error);
+    return { error: true, message: error.message };
   }
 };
 
-// Controller để xử lý yêu cầu gửi thông báo
 exports.pushNotificationController = async (req, res) => {
-  const { title, message, types } = req.body;
+  const authHeader = req.headers.authorization;
 
-  if (!title || !message || !types || !Array.isArray(types) || types.length === 0) {
-    return res.status(400).json({ error: 'Cần có title, message và mảng types người dùng để gửi thông báo.' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Không có token hoặc token không hợp lệ." });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (err) {
+    return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
+  }
+
+  if (!decoded || decoded.role !== "admin") {
+    return res.status(403).json({ error: "Chỉ admin mới được phép gửi thông báo." });
+  }
+
+  const { title, message } = req.body;
+
+  if (!title || !message) {
+    return res.status(400).json({ error: 'Cần có title và message.' });
   }
 
   try {
-    // Tìm tất cả token của các loại người dùng cần gửi
-    const tokens = await Extkn.find({ type: { $in: types } });
+    // Lấy tất cả user có expo_tkn hợp lệ
+    const users = await User.find({
+      expo_tkn: { $ne: "" }
+    });
 
-    if (tokens.length === 0) {
-      return res.status(404).json({ error: 'Không tìm thấy token người dùng phù hợp.' });
+    if (!users.length) {
+      return res.status(404).json({ error: 'Không có người dùng nào có expo_tkn.' });
     }
 
-    const tokenArray = tokens.map(token => token.expoToken);
+    const tokenArray = users.map(user => user.expo_tkn);
+    const results = [];
 
-    // Gửi thông báo đẩy
-    const response = await sendPushNotification(tokenArray, message, title);
+    // Gửi từng token
+    for (const token of tokenArray) {
+      const result = await sendPushNotification(token, message, title);
 
-    // Lưu vào cơ sở dữ liệu
-    // Lưu vào cơ sở dữ liệu
+      // Nếu gửi thành công (không có error) → mới push vào results
+      if (!result.error) {
+        results.push(result);
+      }
+    }
+
+    // Lưu vào Notification (type: user)
     const newNotification = new Notification({
-      title: title,
+      title,
       content: message,
-      type: types,             // Lưu luôn mảng types
+      type: ["user"],
       sendAt: new Date(),
     });
 
     await newNotification.save();
 
     res.status(200).json({
-      message: 'Thông báo đẩy đã được gửi thành công và lưu vào cơ sở dữ liệu!',
-      response: response,
+      message: "Đã gửi thông báo đến tất cả người dùng và lưu vào DB!",
+      resultCount: results.length,
+      results
     });
+
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-;
-
 
 
 //get thông báo 
@@ -172,4 +129,72 @@ exports.getNotificationsByType = async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+};
+
+
+exports.sendNotificationToGuest = async (req, res) => {
+
+try {
+  const { expo_tkn } = req.body;
+
+  if (!expo_tkn) {
+    return res.status(400).json({ message: "expo_tkn không được để trống." });
+  }
+
+  // Kiểm tra token có hợp lệ
+  if (
+    !expo_tkn.startsWith('ExpoPushToken[') &&
+    !expo_tkn.startsWith('ExponentPushToken[')) {
+    return res.status(400).json({ message: "expo_tkn không hợp lệ." });
+  }
+
+  // Lấy danh sách thông báo dành cho "khach"
+  const notifications = await Notification.find({
+    type: "khach"
+  });
+
+  if (!notifications.length) {
+    return res.status(200).json({ message: "Không có thông báo nào dành cho khách." });
+  }
+
+  const results = [];
+
+  // Gửi từng thông báo
+  for (const noti of notifications) {
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Charset': 'UTF-8',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: expo_tkn,
+          sound: 'default',
+          title: noti.title,
+          body: noti.content,
+          data: { id: noti._id },
+        }),
+      });
+
+      const data = await response.json();
+      results.push(data);
+    } catch (err) {
+      console.error("Lỗi gửi notification:", err);
+      results.push({ error: true, message: err.message });
+    }
+  }
+
+  return res.status(200).json({
+    message: "Đã gửi thông báo đến khách",
+    results
+  });
+
+} catch (error) {
+  return res.status(500).json({
+    message: "Lỗi máy chủ.",
+    error: error.message
+  });
+}
 };

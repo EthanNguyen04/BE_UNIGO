@@ -6,5 +6,9 @@ const discountCodeSchema = new mongoose.Schema({
     expiration_date: { type: Date, required: true }, // Ngày hết hạn mã giảm giá
     max_uses: { type: Number, default: 1 }, // Số lần sử dụng tối đa
     times_used: { type: Number, default: 0 } // Số lần đã sử dụng
-});
+}, {
+    timestamps: true  // <-- ở đây  sẽ tự thêm createdAt & updatedAt
+  });
+  
 const DiscountCode = mongoose.model('DiscountCode', discountCodeSchema);
+module.exports = DiscountCode;
