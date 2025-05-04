@@ -84,11 +84,11 @@ async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài kho�
 exports.userLogout = async (req, res) => {
     try {
         const token = req.headers['authorization'];
+        console.log(token)
 
         if (!token) {
             return res.status(400).json({ message: 'Vui lòng cung cấp token!' });
         }
-
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             const user = await User.findById(decoded.userId);
@@ -102,7 +102,10 @@ exports.userLogout = async (req, res) => {
             }
 
             user.invalidTokens.push(token);
-            await user.save();
+             // RESET expo_tkn khi user logout
+             user.expo_tkn = "";
+
+             await user.save();
 
             return res.status(200).json({ message: 'Đăng xuất thành công!' });
         } catch (err) {
@@ -538,6 +541,47 @@ exports.getAllAddresses = async (req, res) => {
     } catch (error) {
       console.error("Lỗi cập nhật địa chỉ:", error);
       return res.status(500).json({ message: "Lỗi server, vui lòng thử lại sau" });
+    }
+  };
+  
+
+
+  exports.updateExpoToken = async (req, res) => {
+    try {
+      // Lấy token từ header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Không có token." });
+      }
+  
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  
+      // Lấy user từ userId
+      const user = await User.findById(decoded.userId);
+      if (!user) {
+        return res.status(404).json({ message: "Người dùng không tồn tại." });
+      }
+  
+      const { expo_tkn } = req.body;
+  
+      if (!expo_tkn) {
+        return res.status(400).json({ message: "expo_tkn không được để trống." });
+      }
+  
+      // Cập nhật expo_tkn
+      user.expo_tkn = expo_tkn;
+      await user.save();
+  
+      return res.status(200).json({
+        message: "Cập nhật expo token thành công.",
+        expo_tkn: user.expo_tkn
+      });
+    } catch (error) {
+      return res.status(500).json({
+        message: "Lỗi máy chủ.",
+        error: error.message,
+      });
     }
   };
   

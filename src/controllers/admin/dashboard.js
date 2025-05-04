@@ -98,7 +98,8 @@ const productController = {
                     category: product.category_id?.name || 'Không xác định',
                     price: displayPrice,
                     totalQuantity,
-                    status: productStatus
+                    status: productStatus,
+                    discount: product.discount
                 };
             });
 

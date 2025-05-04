@@ -281,8 +281,10 @@ exports.getProduct = async (req, res) => {
         id: product._id,
         images: product.image_urls,
         name: product.name,
+        category: product.category_id,
         salePrice: variants[0]?.price, // Lấy giá giảm (nếu có), nếu không lấy giá gốc
         discountPrice: product.variants[0]?.price, // Giá sau khi giảm
+        discount: product.discount,
         quantity: totalQuantity,  // Tổng số lượng tồn kho của tất cả variants
         sold: totalSold,
         description: product.description,

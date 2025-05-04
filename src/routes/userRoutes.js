@@ -27,6 +27,7 @@ router.get('/getInfoUser', userController.getInfoUser);
 router.get('/getUserProfile', userController.getUserProfile);
 
 router.get('/getAllAddresses', userController.getAllAddresses);
+router.put("/update_expo_token", userController.updateExpoToken);
 
 
 module.exports = router;
