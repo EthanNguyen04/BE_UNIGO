@@ -102,7 +102,7 @@ const adminLogout = async (req, res) => {
 
             user.invalidTokens.push(actualToken);
             await user.save();
-            console.log("đăng xuất")
+            //console.log("Dăng xuất")
             return res.status(200).json({ message: 'Đăng xuất admin thành công!' });
         } catch (err) {
             return res.status(401).json({ message: 'Token không hợp lệ hoặc đã hết hạn.' });
@@ -146,7 +146,7 @@ const adminController = {
                 return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
             }
 
-            if (user.role !== 'admin') {
+            if (user.role !== 'admin' && user.role !== 'staff') {
                 return res.status(403).json({ message: 'Truy cập bị từ chối. Không phải là quản trị viên.' });
             }
 
@@ -173,7 +173,7 @@ const adminController = {
             user.otpExpiresAt = null;
             await user.save();
 
-            return res.status(200).json({ message: 'Đăng nhập thành công', token: newToken, fullname: user.full_name });
+            return res.status(200).json({ message: 'Đăng nhập thành công', token: newToken, fullname: user.full_name, role: user.role });
         } catch (error) {
             return res.status(500).json({ message: 'Lỗi máy chủ', error: error.message });
         }

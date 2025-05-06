@@ -1,4 +1,5 @@
 const DiscountCode = require("../models/discountCodeModel");
+const mongoose = require("mongoose");
 
 
 exports.getDiscountCodesBeforeToday = async (req, res) => {
@@ -17,7 +18,7 @@ exports.getDiscountCodesBeforeToday = async (req, res) => {
       // Tìm mã giảm giá
       const discountCodes = await DiscountCode.find({
         createdAt: { $lt: utcBoundary },               // Được tạo trước 00h hôm nay (GMT+7)
-        times_used: { $lt: mongoose.Schema.Types.Mixed.cast('number', '$max_uses') }, // times_used < max_uses
+        $expr: { $lt: ["$times_used", "$max_uses"] },  // So sánh times_used < max_uses
         expiration_date: { $gt: gmt7Now }              // expiration_date > hiện tại GMT+7
       });
   

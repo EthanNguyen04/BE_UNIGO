@@ -43,7 +43,7 @@ exports.pushNotificationController = async (req, res) => {
     return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
   }
 
-  if (decoded.role !== "admin") {
+  if (decoded.role !== "admin"&& decoded.role !== "staff") {
     return res.status(403).json({ error: "Chỉ admin mới được phép gửi thông báo." });
   }
 
@@ -74,7 +74,7 @@ exports.pushNotificationController = async (req, res) => {
       if (!result.error) {
         results.push({ token: expoToken, ...result });
       }
-      console.log('Sent to:', expoToken);
+      console.log('-> Sent Notification to:', expoToken);
     }
 
     // Lưu thông báo vào collection Notification

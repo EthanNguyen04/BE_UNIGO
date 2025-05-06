@@ -75,7 +75,7 @@ async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài kho�
 
         // Gửi email
         await transporter.sendMail(mailOptions);
-        console.log('Email OTP đã được gửi thành công!');
+        console.log('---> Email OTP đã được gửi thành công!');
     } catch (error) {
         console.error('Lỗi khi gửi email OTP:', error);
     }
@@ -84,7 +84,7 @@ async function sendOTPEmail(toEmail, otp, customSubject = 'Xác thực tài kho�
 exports.userLogout = async (req, res) => {
     try {
         const token = req.headers['authorization'];
-        console.log(token)
+        //console.log(token)
 
         if (!token) {
             return res.status(400).json({ message: 'Vui lòng cung cấp token!' });

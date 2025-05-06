@@ -37,7 +37,7 @@ exports.updateCategoryById = async (req, res) => {
         // Xác thực token và kiểm tra quyền
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.userId);
-        if (!user || user.role !== 'admin') {
+        if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
             return res.status(403).json({ message: 'Chỉ có admin mới có quyền chỉnh sửa danh mục!' });
         }
 
@@ -83,7 +83,7 @@ exports.toggleCategoryStatus = async (req, res) => {
         const user = await User.findById(decoded.userId);
 
         // Kiểm tra quyền admin
-        if (!user || user.role !== 'admin') {
+        if (!user || user.role !== 'admin' && user.role !== 'staff') {
             return res.status(403).json({ message: 'Chỉ admin mới có quyền thay đổi trạng thái danh mục!' });
         }
 

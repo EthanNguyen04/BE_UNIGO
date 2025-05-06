@@ -50,7 +50,7 @@ exports.pushNotificationController = async (req, res) => {
     return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
   }
 
-  if (!decoded || decoded.role !== "admin") {
+  if (!decoded || decoded.role !== "admin" && decoded.role !== "staff") {
     return res.status(403).json({ error: "Chỉ admin mới được phép gửi thông báo." });
   }
 
@@ -124,7 +124,7 @@ exports.getNotificationsByType = async (req, res) => {
       content: n.content,
       time: moment(n.sendAt).format('HH:mm DD/MM/YYYY'),
     }));
-
+    //console.log(formatted)
     res.status(200).json({ notifications: formatted });
   } catch (error) {
     res.status(500).json({ error: error.message });

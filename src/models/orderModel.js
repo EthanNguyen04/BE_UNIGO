@@ -27,13 +27,13 @@ const orderSchema = new mongoose.Schema({
                     // Thuộc tính của sản phẩm (màu sắc, kích thước,...)
                     attributes: {
                         color: { type: String },
-                        size: { type: String }
-                    },
+                        size: { type: String },
                     // Số lượng đặt mua cho phiên bản này
                     quantity: { 
                         type: Number, 
                         required: true 
                     }
+                },
                 }
             ]
         }
@@ -57,7 +57,8 @@ const orderSchema = new mongoose.Schema({
     // Phương thức thanh toán (ví dụ: COD, chuyển khoản, v.v.)
     payment_method: { 
         type: String, 
-        required: true 
+        enum: ['payment', 'cod'], 
+        default: 'payment' 
     },
     // Trạng thái thanh toán (ví dụ: Chưa thanh toán, Đã thanh toán)
     payment_status: { 

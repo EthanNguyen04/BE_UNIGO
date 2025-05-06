@@ -9,4 +9,5 @@ router.get("/get_cart", cartController.getUserCartProducts);
 
 router.get("/get_count_cart", cartController.getCountCart);
 
+router.post("/delete-product_cart", cartController.removeProductsFromCart);
 module.exports = router;
