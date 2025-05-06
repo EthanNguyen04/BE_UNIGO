@@ -67,21 +67,21 @@ exports.createCategory = async (req, res) => {
                 .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Viết hoa chữ cái đầu
                 .join(' ');                     // Ghép lại thành chuỗi
         }
-        console.log('Tên danh mục nhận được từ req.body:', name);
+        //console.log('Tên danh mục nhận được từ req.body:', name);
 
         try {
             // Xác thực token
-            console.log("Token nhận được:", token);
+            //console.log("Token nhận được:", token);
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
-            console.log("Decoded token:", decoded);
-            console.log("User từ token:", decoded.userId);
+            //console.log("Decoded token:", decoded);
+            //console.log("User từ token:", decoded.userId);
 
             const user = await User.findById(decoded.userId);
-            console.log("User tìm được:", user.role);
+            //console.log("User tìm được:", user.role);
 
 
             // Kiểm tra quyền admin
-            if (!user || user.role !== 'admin') {
+            if (!user || user.role !== 'admin'|| user.role !== 'admin' ) {
                 return res.status(403).json({ message: 'Chỉ có admin mới có quyền tạo danh mục!' });
             }
 
@@ -90,13 +90,13 @@ exports.createCategory = async (req, res) => {
             if (existingCategory) {
                 return res.status(400).json({ message: 'Danh mục đã tồn tại!' });
             }
-            console.log("đến đây :", user.role);
+            //console.log("đến đây :", user.role);
             // Tạo mới danh mục
             const newCategory = new Category({ name });
-            console.log("đến đây 2 :", user.role);
+            //console.log("đến đây 2 :", user.role);
 
             await newCategory.save();
-            console.log("đến đây 3:", user.role);
+            //console.log("đến đây 3:", user.role);
 
 
             return res.status(201).json({ message: 'Tạo danh mục thành công!', category: newCategory });

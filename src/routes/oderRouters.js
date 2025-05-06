@@ -5,5 +5,6 @@ const router = express.Router();
 
 
 router.get("/get_oder_count", orderController.countOrders);
+router.post("/create_order", orderController.createOrder);
 
 module.exports = router;

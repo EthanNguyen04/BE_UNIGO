@@ -86,7 +86,7 @@ exports.createOrUpdateCart = async (req, res) => {
 };
 
 
-  // Controller lấy danh sách product của user dựa trên token gửi từ header
+// Controller lấy danh sách product của user dựa trên token gửi từ header
 // Controller GET danh sách sản phẩm trong cart của user dựa trên token gửi ở header Authorization
 exports.getUserCartProducts = async (req, res) => {
     try {
@@ -122,7 +122,7 @@ exports.getUserCartProducts = async (req, res) => {
       const products = cart.products.map(item => {
         // item.product_id đã được populate -> là document Product
         const productDoc = item.product_id;
-        
+      
         // Tìm variant của sản phẩm tương ứng với color và size của mục trong cart
         const matchedVariant = productDoc.variants.find(variant => {
           return variant.color === item.color && variant.size === item.size;
@@ -146,8 +146,9 @@ exports.getUserCartProducts = async (req, res) => {
           price: effectivePrice
         };
       });
-      
-      return res.status(200).json({ products });
+      console.log(products)
+      return res.status(200).json({
+        products });
     } catch (error) {
       console.error('Lỗi khi lấy danh sách sản phẩm của user từ cart:', error);
       return res.status(500).json({ error: 'Lỗi server' });
@@ -189,3 +190,62 @@ exports.getCountCart = async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   };
+
+
+  
+  exports.removeProductsFromCart = async (req, res) => {
+    try {
+      // Lấy token từ header
+      const authHeader = req.headers.authorization;
+  
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Token không hợp lệ hoặc không có token." });
+      }
+  
+      const token = authHeader.split(" ")[1];
+  
+      // Xác thực token
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
+      }
+  
+      const userId = decoded.userId;
+  
+      // Lấy danh sách sản phẩm cần xoá
+      const { products } = req.body;
+  
+      if (!products || !Array.isArray(products) || products.length === 0) {
+        return res.status(400).json({ error: "Vui lòng gửi danh sách sản phẩm cần xoá." });
+      }
+  
+      // Tìm Cart của user
+      const cart = await Cart.findOne({ user_id: userId });
+      if (!cart) {
+        return res.status(404).json({ error: "Không tìm thấy giỏ hàng của người dùng." });
+      }
+  
+      // Xoá sản phẩm
+      products.forEach(product => {
+        cart.products = cart.products.filter(item => {
+          return !(
+            item.product_id.toString() === product.product_id &&
+            item.color === product.color &&
+            item.size === product.size
+          );
+        });
+      });
+  
+      // Lưu lại cart
+      await cart.save();
+  
+      res.status(200).json({ message: "Xoá sản phẩm khỏi giỏ hàng thành công!", cart });
+  
+    } catch (error) {
+      console.error("Lỗi khi xoá sản phẩm khỏi giỏ hàng:", error);
+      res.status(500).json({ error: "Lỗi máy chủ" });
+    }
+  };
+  

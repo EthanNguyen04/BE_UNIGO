@@ -4,6 +4,7 @@ const productAController = require("../controllers/admin/productAController"); /
 const categoryAController = require("../controllers/admin/categoryAController"); // Kiểm tra đường dẫn
 const discountAController = require("../controllers/admin/discountAController"); // Kiểm tra đường dẫn
 const notiAController = require("../controllers/admin/notiAController"); // Kiểm tra đường dẫn
+const userAController = require("../controllers/admin/userAController"); // Kiểm tra đường dẫn
 
 
 const router = express.Router();
@@ -27,6 +28,8 @@ router.get('/get_all_discounts', discountAController.getAllDiscountCodes);
 
 router.put('/update_discount', discountAController.updateDiscountCode);  
 router.post('/send-notification', notiAController.pushNotificationController);
+router.get('/getAllUsers', userAController.getAllUsers);
 
+router.post('/add_staff', userAController.addStaff);
 
 module.exports = router;

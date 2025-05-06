@@ -11,7 +11,7 @@ exports.createDiscountCode = async (req, res) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded || decoded.role !== "admin") {
+    if (!decoded || decoded.role !== "admin" && decoded.role !== "staff") {
       return res.status(403).json({ message: "Bạn không có quyền." });
     }
 
@@ -58,7 +58,7 @@ exports.getAllDiscountCodes = async (req, res) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded || decoded.role !== "admin") {
+    if (!decoded || decoded.role !== "admin" && decoded.role !== "staff") {
       return res.status(403).json({ message: "Bạn không có quyền truy cập." });
     }
 
@@ -92,7 +92,7 @@ exports.getAllDiscountCodes = async (req, res) => {
         updated_at: discount.updatedAt,
       };
     });
-    console.log(formattedDiscounts);
+    //console.log(formattedDiscounts);
     return res.status(200).json({
       message: "Danh sách mã giảm giá",
       discounts: formattedDiscounts,
@@ -117,7 +117,7 @@ exports.updateDiscountCode = async (req, res) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!decoded || decoded.role !== "admin") {
+    if (!decoded || decoded.role !== "admin"&& decoded.role !== "staff") {
       return res.status(403).json({ message: "Bạn không có quyền." });
     }
 

@@ -14,7 +14,7 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage }).array('images', 6); // tối đa 6 ảnh
 
 exports.addProduct = (req, res) => {
-    console.log("đã gọi")
+    //console.log("đã gọi")
   // Sử dụng multer để xử lý file upload
   upload(req, res, async function (err) {
     if (err) {
@@ -30,7 +30,7 @@ exports.addProduct = (req, res) => {
       token = token.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findById(decoded.userId);
-      if (!user || user.role !== 'admin') {
+      if (!user || user.role !== 'admin' && user.role !== 'staff' ) {
         return res.status(403).json({ message: 'Chỉ admin mới có quyền thêm sản phẩm!' });
       }
 
@@ -75,7 +75,7 @@ exports.addProduct = (req, res) => {
       if (!fs.existsSync(productImageFolder)) {
         fs.mkdirSync(productImageFolder, { recursive: true });
       }
-      console.log("đã gọi")
+      //console.log("đã gọi")
 
       // Lưu các file ảnh đã upload vào thư mục và tạo đường dẫn lưu trữ
       const image_urls = [];
@@ -104,10 +104,10 @@ exports.editProduct = (req, res) => {
     }
 
     // 📌 LOG TOÀN BỘ DỮ LIỆU NHẬN VỀ
-    console.log('--- editProduct called ---');
-    console.log('Params:', req.params);
-    console.log('Body:', req.body);
-    console.log('Files:', req.files);
+    // console.log('--- editProduct called ---');
+    // console.log('Params:', req.params);
+    // console.log('Body:', req.body);
+    // console.log('Files:', req.files);
 
     try {
       // 1. Xác thực token & quyền admin
@@ -118,7 +118,7 @@ exports.editProduct = (req, res) => {
       token = token.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user    = await User.findById(decoded.userId);
-      if (!user || user.role !== 'admin') {
+      if (!user || user.role !== 'admin' && user.role !== 'staff') {
         return res.status(403).json({ message: 'Chỉ admin mới có quyền sửa sản phẩm!' });
       }
 
