@@ -1,6 +1,6 @@
+const dotenv = require("dotenv");
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
 const path = require('path');
 const cookieParser = require('cookie-parser');
 
@@ -35,6 +35,7 @@ app.use("/api/discount", require("./routes/discountRouter"));
 // Định tuyến ADMIN
 app.use("/manager", require("./routes/managerRouters"));
 
+app.use('/vnpay', require("./routes/paymentRoutes"));
 
 
 

@@ -107,3 +107,46 @@ exports.addStaff = async (req, res) => {
       });
     }
   };
+
+  exports.deleteStaff = async (req, res) => {
+    try {
+      // 1. Xác thực token & kiểm tra admin
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Token không hợp lệ hoặc thiếu." });
+      }
+      let decoded;
+      try {
+        decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+      } catch {
+        return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
+      }
+      if (decoded.role !== "admin") {
+        return res.status(403).json({ error: "Chỉ admin mới có quyền xóa nhân viên." });
+      }
+  
+      // 2. Lấy userId cần xóa từ params
+      const { userId } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({ error: "userId không hợp lệ." });
+      }
+  
+      // 3. Tìm user
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "Không tìm thấy người dùng." });
+      }
+      if (user.role !== "staff") {
+        return res.status(400).json({ error: "Chỉ có thể xóa nhân viên (role = staff)." });
+      }
+  
+      // 4. Xóa user
+      await User.findByIdAndDelete(userId);
+  
+      return res.status(200).json({ message: "Xóa nhân viên thành công." });
+    } catch (err) {
+      console.error("Lỗi deleteStaff:", err);
+      return res.status(500).json({ error: "Lỗi máy chủ.", details: err.message });
+    }
+  };
+  
