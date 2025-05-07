@@ -5,6 +5,7 @@ const categoryAController = require("../controllers/admin/categoryAController");
 const discountAController = require("../controllers/admin/discountAController"); // Kiểm tra đường dẫn
 const notiAController = require("../controllers/admin/notiAController"); // Kiểm tra đường dẫn
 const userAController = require("../controllers/admin/userAController"); // Kiểm tra đường dẫn
+const orderAcontroller = require("../controllers/admin/orderAcontroller"); // Kiểm tra đường dẫn
 
 
 const router = express.Router();
@@ -31,5 +32,11 @@ router.post('/send-notification', notiAController.pushNotificationController);
 router.get('/getAllUsers', userAController.getAllUsers);
 
 router.post('/add_staff', userAController.addStaff);
+router.delete('/delete_staff/:userId', userAController.deleteStaff);
+
+router.get("/orders", orderAcontroller.getAllOrders);
+
+router.put("/orders/status", orderAcontroller.batchUpdateOrderStatus);
+router.get("/stats/daily-sales", orderAcontroller.getDailySalesStats);
 
 module.exports = router;

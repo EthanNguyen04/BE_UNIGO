@@ -195,57 +195,121 @@ exports.getCountCart = async (req, res) => {
   
   exports.removeProductsFromCart = async (req, res) => {
     try {
-      // Lấy token từ header
+      // 1. Xác thực token
       const authHeader = req.headers.authorization;
-  
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Token không hợp lệ hoặc không có token." });
+      if (!authHeader?.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Token không hợp lệ hoặc thiếu." });
       }
-  
-      const token = authHeader.split(" ")[1];
-  
-      // Xác thực token
       let decoded;
       try {
-        decoded = jwt.verify(token, process.env.JWT_SECRET);
-      } catch (err) {
+        decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+      } catch {
         return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
       }
-  
       const userId = decoded.userId;
   
-      // Lấy danh sách sản phẩm cần xoá
+      // 2. Lấy danh sách sản phẩm cần xoá
       const { products } = req.body;
-  
-      if (!products || !Array.isArray(products) || products.length === 0) {
+      if (!Array.isArray(products) || products.length === 0) {
         return res.status(400).json({ error: "Vui lòng gửi danh sách sản phẩm cần xoá." });
       }
   
-      // Tìm Cart của user
+      // 3. Tìm cart
       const cart = await Cart.findOne({ user_id: userId });
       if (!cart) {
         return res.status(404).json({ error: "Không tìm thấy giỏ hàng của người dùng." });
       }
   
-      // Xoá sản phẩm
-      products.forEach(product => {
-        cart.products = cart.products.filter(item => {
-          return !(
-            item.product_id.toString() === product.product_id &&
-            item.color === product.color &&
-            item.size === product.size
-          );
-        });
+      // 4. Xóa từng sản phẩm
+      let removedCount = 0;
+      products.forEach(({ product_id, color, size }) => {
+        const before = cart.products.length;
+        cart.products = cart.products.filter(item =>
+          !(
+            item.product_id.toString() === product_id &&
+            item.color === color &&
+            item.size === size
+          )
+        );
+        removedCount += (before - cart.products.length);
       });
   
-      // Lưu lại cart
-      await cart.save();
-  
-      res.status(200).json({ message: "Xoá sản phẩm khỏi giỏ hàng thành công!", cart });
-  
+      // 5. Nếu có xóa thì save, không thì bỏ qua
+      if (removedCount > 0) {
+        await cart.save();
+        return res.status(200).json({
+          message: `Đã xóa ${removedCount} mục khỏi giỏ hàng.`,
+          cart
+        });
+      } else {
+        return res.status(200).json({
+          message: "Không tìm thấy mục nào trùng khớp, không có gì thay đổi.",
+          cart
+        });
+      }
     } catch (error) {
       console.error("Lỗi khi xoá sản phẩm khỏi giỏ hàng:", error);
-      res.status(500).json({ error: "Lỗi máy chủ" });
+      return res.status(500).json({ error: "Lỗi máy chủ." });
     }
   };
   
+
+  
+exports.updateCartQuantity = async (req, res) => {
+  try {
+    // 1) Xác thực token và lấy userId
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Token không hợp lệ hoặc thiếu." });
+    }
+    let decoded;
+    try {
+      decoded = jwt.verify(authHeader.split(" ")[1], process.env.JWT_SECRET);
+    } catch {
+      return res.status(403).json({ error: "Token không hợp lệ hoặc đã hết hạn." });
+    }
+    const userId = decoded.userId;
+
+    // 2) Lấy data từ body
+    const { product_id, color, size, quantity } = req.body;
+    if (!product_id || !quantity || quantity < 1) {
+      return res.status(400).json({ error: "Vui lòng gửi product_id và quantity ≥ 1." });
+    }
+
+    // 3) Tìm cart của user
+    const cart = await Cart.findOne({ user_id: userId });
+    if (!cart) {
+      return res.status(404).json({ error: "Không tìm thấy giỏ hàng." });
+    }
+
+    // 4) Tìm item phù hợp và cập nhật quantity
+    let found = false;
+    cart.products = cart.products.map(item => {
+      if (
+        item.product_id.toString() === product_id &&
+        item.color === color &&
+        item.size === size
+      ) {
+        found = true;
+        return {
+          ...item.toObject(),
+          quantity
+        };
+      }
+      return item;
+    });
+
+    if (!found) {
+      return res
+        .status(404)
+        .json({ message: "Không tìm thấy sản phẩm/màu/kích thước tương ứng trong giỏ." });
+    }
+
+    // 5) Lưu lại và trả về cart mới
+    await cart.save();
+    res.status(200).json({ message: "Cập nhật số lượng thành công!", cart });
+  } catch (err) {
+    console.error("Lỗi updateCartQuantity:", err);
+    res.status(500).json({ error: "Lỗi máy chủ.", details: err.message });
+  }
+};

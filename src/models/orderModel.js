@@ -13,7 +13,7 @@ const orderSchema = new mongoose.Schema({
             // ID sản phẩm
             product_id: { 
                 type: mongoose.Schema.Types.ObjectId, 
-                ref: 'Product', 
+                ref: 'Prosucttest', 
                 required: true 
             },
             // Các phiên bản (variant) của sản phẩm
@@ -63,8 +63,8 @@ const orderSchema = new mongoose.Schema({
     // Trạng thái thanh toán (ví dụ: Chưa thanh toán, Đã thanh toán)
     payment_status: { 
         type: String, 
-        enum: ['Chưa thanh toán', 'Đã thanh toán'], 
-        default: 'Chưa thanh toán' 
+        enum: ['chua_thanh_toan', 'da_thanh_toan'], 
+        default: 'chua_thanh_toan' 
     },
     // Trạng thái đơn hàng
     order_status: {

@@ -1,7 +1,6 @@
 const fetch = require('node-fetch'); // Vẫn sử dụng require để gọi node-fetch
 
 const jwt = require('jsonwebtoken');
-const Extkn = require('../models/expoPush'); // Đảm bảo bạn đã import model đúng đường dẫn
 const User = require('../models/userModel'); // Import model User để kiểm tra thông tin người dùng
 const Notification = require('../models/notification'); // Import model User để kiểm tra thông tin người dùng
 const moment = require('moment'); // Import moment vào file
