@@ -244,56 +244,67 @@ exports.getAllSaleProducts = async (req, res) => {
 //lấy chi tiết 1 sản phẩm
 
 exports.getProduct = async (req, res) => {
-    try {
-      const productId = req.params.id;
-  
-      // Tìm sản phẩm theo id
-      const product = await Product.findById(productId);
-      if (!product) {
-        return res.status(404).json({ message: "Sản phẩm không tồn tại!" });
-      }
-  
-      // Tính tổng số lượng đã bán dựa vào tất cả các variant trong các đơn hàng có sản phẩm này
-      const orderAggregation = await Order.aggregate([
-        { $unwind: "$products" },
-        { $match: { "products.product_id": new mongoose.Types.ObjectId(productId) } },
-        { $unwind: "$products.variants" },
-        { $group: { _id: null, totalSold: { $sum: "$products.variants.quantity" } } }
-      ]);
-  
-      const totalSold = orderAggregation.length > 0 ? orderAggregation[0].totalSold : 0;
-  
-      // Tính tổng số lượng tồn kho của tất cả các variants
-      const totalQuantity = product.variants.reduce((acc, variant) => acc + variant.quantity, 0);
-  
-      // Xử lý variants, áp dụng discount vào giá từng variant
-      const variants = product.variants.map(variant => {
-        const discountedPrice = variant.price * (1 - product.discount / 100); // Áp dụng phần trăm giảm giá
-        return {
-          price: discountedPrice,
-          quantity: variant.quantity,
-          size: variant.size,
-          color: variant.color
-        };
-      });
-  
-      return res.json({
-        id: product._id,
-        images: product.image_urls,
-        name: product.name,
-        category: product.category_id,
-        salePrice: variants[0]?.price, // Lấy giá giảm (nếu có), nếu không lấy giá gốc
-        discountPrice: product.variants[0]?.price, // Giá sau khi giảm
-        discount: product.discount,
-        quantity: totalQuantity,  // Tổng số lượng tồn kho của tất cả variants
-        sold: totalSold,
-        description: product.description,
-        variants: variants
-      });
-    } catch (error) {
-      return res.status(500).json({ message: error.message });
+  try {
+    const productId = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: "productId không hợp lệ." });
     }
-  };
+
+    // 1. Tìm sản phẩm
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Sản phẩm không tồn tại!" });
+    }
+
+    // 2. Tính tổng số đã bán (chỉ tính các đơn đã thanh toán)
+    const orderAggregation = await Order.aggregate([
+      // Lọc đơn đã thanh toán và chứa sản phẩm này
+      { $match: {
+          payment_status: "da_thanh_toan",
+          "products.product_id": new mongoose.Types.ObjectId(productId)
+      }},
+      // Tách mảng products
+      { $unwind: "$products" },
+      // Giữ lại chỉ mục sản phẩm cần
+      { $match: { "products.product_id": new mongoose.Types.ObjectId(productId) } },
+      // Tách tiếp mảng variants
+      { $unwind: "$products.variants" },
+      // Nhóm để tính tổng quantity
+      { $group: {
+          _id: null,
+          totalSold: { $sum: "$products.variants.attributes.quantity" }
+      }}
+    ]);
+    const totalSold = orderAggregation[0]?.totalSold || 0;
+
+    // 3. Tổng tồn kho tất cả variants
+    const totalQuantity = product.variants
+      .reduce((sum, v) => sum + v.quantity, 0);
+
+    // 4. Xử lý variants kèm giá đã áp dụng discount
+    const variants = product.variants.map(v => ({
+      price:    Number((v.price * (1 - product.discount/100)).toFixed(2)),
+      quantity: v.quantity,
+      size:     v.size,
+      color:    v.color
+    }));
+
+    return res.json({
+      id:           product._id,
+      images:       product.image_urls,
+      name:         product.name,
+      category:     product.category_id,
+      discount:     product.discount,
+      stock:        totalQuantity,
+      sold:         totalSold,
+      description:  product.description,
+      variants
+    });
+  } catch (error) {
+    console.error("Lỗi getProduct:", error);
+    return res.status(500).json({ message: "Lỗi máy chủ.", error: error.message });
+  }
+};
 
  // lấy sản phẩm theo tên, giá (sắp xếp từ cao xuống thấp) và phân loại (category)
  // Hàm tìm kiếm sản phẩm theo tên gần đúng, có thể lọc theo danh mục (idCategory) và sắp xếp giá
