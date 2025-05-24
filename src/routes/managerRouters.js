@@ -1,5 +1,5 @@
 const express = require("express");
-const { adminStatisticsController, productController } = require("../controllers/admin/dashboard");
+const { adminStatisticsController, productController, getStats } = require("../controllers/admin/dashboard");
 const productAController = require("../controllers/admin/productAController"); // Kiểm tra đường dẫn
 const categoryAController = require("../controllers/admin/categoryAController"); // Kiểm tra đường dẫn
 const discountAController = require("../controllers/admin/discountAController"); // Kiểm tra đường dẫn
@@ -37,6 +37,10 @@ router.delete('/delete_staff/:userId', userAController.deleteStaff);
 router.get("/orders", orderAcontroller.getAllOrders);
 
 router.put("/orders/status", orderAcontroller.batchUpdateOrderStatus);
-router.get("/stats/daily-sales", orderAcontroller.getDailySalesStats);
+router.get("/stats_daily", orderAcontroller.getDailySalesStats);
+
+
+router.get('/stats', getStats.getStat);
+
 
 module.exports = router;

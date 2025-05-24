@@ -2,6 +2,7 @@ const User = require('../../models/userModel');
 const Product = require('../../models/productModel');
 const Order = require('../../models/orderModel');
 const Category = require('../../models/categoryModel');
+const jwt = require('jsonwebtoken');
 
 
 // Controller chứa hàm lấy thống kê của admin
@@ -110,8 +111,113 @@ const productController = {
     }
 };
 
+// Controller lấy thống kê top sản phẩm
+const getStats = {
+    async getStat(req, res) {
+        try {
+            // Kiểm tra token xác thực
+            const authHeader = req.headers.authorization;
+            if (!authHeader || !authHeader.startsWith("Bearer ")) {
+                return res.status(401).json({ message: "Không có token." });
+            }
+
+            const token = authHeader.split(" ")[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+            if (!decoded || (decoded.role !== "admin")) {
+                return res.status(403).json({ message: "Bạn không có quyền." });
+            }
+
+            // Xác định điều kiện tìm kiếm dựa vào query parameter
+            let orderQuery = {};
+            if (req.query.order_status === 'hoan_thanh') {
+                // Chỉ lấy đơn hàng hoàn thành
+                orderQuery = { order_status: 'hoan_thanh' };
+            } else {
+                // Lấy tất cả đơn hàng trừ đơn đã hủy
+                orderQuery = { order_status: { $ne: 'da_huy' } };
+            }
+
+            // Lấy đơn hàng theo điều kiện
+            const orders = await Order.find(orderQuery).populate('products.product_id');
+
+            // Tạo map để lưu thống kê cho từng sản phẩm
+            const productStats = new Map();
+
+            // Duyệt qua từng đơn hàng
+            orders.forEach(order => {
+                order.products.forEach(item => {
+                    const productId = item.product_id._id.toString();
+                    const productName = item.product_id.name;
+
+                    // Nếu sản phẩm chưa có trong map, khởi tạo
+                    if (!productStats.has(productId)) {
+                        productStats.set(productId, {
+                            productId,
+                            productName,
+                            totalQuantity: 0,
+                            totalRevenue: 0,
+                            averageRating: 3 // Giá trị mặc định
+                        });
+                    }
+
+                    const stats = productStats.get(productId);
+
+                    // Cộng dồn số lượng và doanh thu từ các variants
+                    item.variants.forEach(variant => {
+                        stats.totalQuantity += variant.attributes.quantity;
+                        stats.totalRevenue += variant.price * variant.attributes.quantity;
+                    });
+                });
+            });
+
+            // Chuyển map thành array và sắp xếp theo totalQuantity giảm dần
+            const sortedStats = Array.from(productStats.values())
+                .sort((a, b) => b.totalQuantity - a.totalQuantity)
+                .slice(0, 10); // Lấy top 10
+
+            /*
+            * Ví dụ dữ liệu trả về:
+            * {
+            *   "success": true,
+            *   "data": [
+            *     {
+            *       "productId": "65f2e8b7c261e6001234abcd",
+            *       "productName": "Áo thun nam",
+            *       "totalQuantity": 150,
+            *       "totalRevenue": 4500000,
+            *       "averageRating": 3
+            *     },
+            *     {
+            *       "productId": "65f2e8b7c261e6001234abce",
+            *       "productName": "Quần jean nữ",
+            *       "totalQuantity": 120,
+            *       "totalRevenue": 3600000,
+            *       "averageRating": 3
+            *     },
+            *     // ... các sản phẩm khác
+            *   ]
+            * }
+            */
+
+            return res.status(200).json({
+                success: true,
+                data: sortedStats
+            });
+
+        } catch (error) {
+            console.error('Lỗi khi lấy thống kê:', error);
+            return res.status(500).json({
+                success: false,
+                error: 'Lỗi máy chủ'
+            });
+        }
+    }
+};
+
 // Xuất controller để sử dụng trong router
 module.exports = {
     adminStatisticsController,
-    productController
+    productController,
+    getStats
 };

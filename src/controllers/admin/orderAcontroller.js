@@ -197,7 +197,7 @@ exports.batchUpdateOrderStatus = async (req, res) => {
         // chỉ lấy order đã thanh toán trong khoảng UTC
         { $match: {
             createdAt:      { $gte: startUtc, $lt: endUtc },
-            payment_status: "da_thanh_toan"
+            payment_status: "chua_thanh_toan"
         }},
         // lookup mã giảm giá
         { $lookup: {
@@ -233,6 +233,7 @@ exports.batchUpdateOrderStatus = async (req, res) => {
                 "$products.variants.attributes.quantity"
               ]
             }},
+            totalPriceIn: { $first: "$totalPriceIn" },
             discount_percent: { $first: "$discount_percent" }
         }},
         // tính doanh thu đã giảm cho mỗi order
@@ -248,18 +249,22 @@ exports.batchUpdateOrderStatus = async (req, res) => {
         { $group: {
             _id: "$_id.day",
             totalQuantity: { $sum: "$sumQty" },
-            totalRevenue:  { $sum: "$revenue" }
+            totalRevenue:  { $sum: "$revenue" },
+            totalImportPrice: { $sum: "$totalPriceIn" }
         }},
         // định dạng output
         { $project: {
             _id:           0,
             day:           "$_id",
             totalQuantity: 1,
-            totalRevenue: 1
+            totalRevenue: 1,
+            totalImportPrice: 1
         }},
         { $sort: { day: 1 } }
       ]);
-  
+
+      console.log('Daily Sales Stats:', JSON.stringify(stats, null, 2));
+      
       return res.status(200).json({ year, month, stats });
     } catch (err) {
       console.error("Lỗi getDailySalesStats:", err);

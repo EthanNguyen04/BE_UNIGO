@@ -75,6 +75,12 @@ const orderSchema = new mongoose.Schema({
     // Lí do hủy đơn hàng (chỉ có khi order_status là "Hủy")
     cancellation_reason: { 
         type: String 
+    },
+    vnp_TxnRef: {
+        type: String //vnp_TxnRef=1746550585875
+    },
+    totalPriceIn:{
+        type: Number
     }
 }, { timestamps: true });
 
