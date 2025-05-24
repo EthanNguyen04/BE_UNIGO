@@ -70,21 +70,38 @@ exports.createOrder = async (req, res) => {
       }
   
       // 3. Deduct stock for each variant
+      let totalPriceIn = 0;
       for (const item of products) {
         const { product_id, variants } = item;
+        const product = await Product.findById(product_id).session(session);
+        
         for (const v of variants) {
           const { color, size, quantity } = v.attributes;
+          const variant = product.variants.find(
+            variant => variant.color === color && variant.size === size
+          );
+          
+          if (!variant || variant.quantity < quantity) {
+            throw new Error(
+              `Không đủ hàng cho sản phẩm ${product_id} (${color}/${size})`
+            );
+          }
+
+          // Add priceIn to the variant data
+          v.priceIn = variant.priceIn;
+          totalPriceIn += variant.priceIn * quantity;
+
           const updateResult = await Product.updateOne(
             {
               _id: product_id,
               "variants.color": color,
               "variants.size": size,
-              "variants.quantity": { $gte: quantity }  // ensure enough stock
+              "variants.quantity": { $gte: quantity }
             },
             { $inc: { "variants.$.quantity": -quantity } }
           ).session(session);
+          
           if (updateResult.matchedCount === 0) {
-            // either product/variant not found or insufficient stock
             throw new Error(
               `Không đủ hàng cho sản phẩm ${product_id} (${color}/${size})`
             );
@@ -100,7 +117,8 @@ exports.createOrder = async (req, res) => {
             products,
             shipping_address,
             discount_code_id: discount_code_id || null,
-            payment_method: payment_method || "cod"
+            payment_method: payment_method || "cod",
+            totalPriceIn
           }
         ],
         { session }
@@ -128,7 +146,7 @@ exports.createOrder = async (req, res) => {
 exports.updatePaymentStatus = async (req, res) => {
     try {
       const { orderId } = req.params;
-      const { payment_status } = req.body;
+      const { payment_status, vnp_TxnRef } = req.body;
   
       // Validate orderId
       if (!mongoose.Types.ObjectId.isValid(orderId)) {
@@ -144,7 +162,7 @@ exports.updatePaymentStatus = async (req, res) => {
       // Tìm và cập nhật
       const updatedOrder = await Order.findByIdAndUpdate(
         orderId,
-        { payment_status },
+        { payment_status , vnp_TxnRef},
         { new: true }
       );
   

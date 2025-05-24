@@ -47,8 +47,8 @@ exports.createOrUpdateCart = async (req, res) => {
         // Nếu có, chỉ cập nhật số lượng
         cart.products[existingProductIndex].quantity += quantityValue;
       } else {
-        // Nếu không có, thêm mới sản phẩm vào giỏ hàng
-        cart.products.push({
+        // Nếu không có, thêm mới sản phẩm vào đầu giỏ hàng
+        cart.products.unshift({
           product_id,
           color: color || null,
           size: size || null,
@@ -179,11 +179,11 @@ exports.getCountCart = async (req, res) => {
       let totalProducts = 0;
       
       if (cart && Array.isArray(cart.products)) {
-        // Tính tổng số sản phẩm (cộng dồn số lượng của từng sản phẩm)
-        totalProducts = cart.products.reduce((total, item) => total + (item.quantity || 0), 0);
+        // Đếm số lượng sản phẩm (mỗi sản phẩm chỉ tính 1 lần)
+        totalProducts = cart.products.length;
       }
       
-      // Trả về tổng số sản phẩm trong giỏ hàng
+      // Trả về số lượng sản phẩm trong giỏ hàng
       return res.json({ total_products: totalProducts });
     } catch (error) {
       console.error("Error in getCountCart:", error);
