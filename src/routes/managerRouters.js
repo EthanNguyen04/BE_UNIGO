@@ -39,6 +39,7 @@ router.get("/orders", orderAcontroller.getAllOrders);
 router.put("/orders/status", orderAcontroller.batchUpdateOrderStatus);
 router.get("/stats_daily", orderAcontroller.getDailySalesStats);
 
+router.patch('/product_discount/:id', productAController.updateProductDiscount);
 
 router.get('/stats', getStats.getStat);
 

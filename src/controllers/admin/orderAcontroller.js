@@ -194,10 +194,11 @@ exports.batchUpdateOrderStatus = async (req, res) => {
   
       // 4. Aggregation pipeline
       const stats = await Order.aggregate([
-        // chỉ lấy order đã thanh toán trong khoảng UTC
+        // chỉ lấy order đã thanh toán và hoàn thành trong khoảng UTC
         { $match: {
             createdAt:      { $gte: startUtc, $lt: endUtc },
-            payment_status: "chua_thanh_toan"
+            payment_status: "da_thanh_toan",
+            order_status:   "hoan_thanh"
         }},
         // lookup mã giảm giá
         { $lookup: {

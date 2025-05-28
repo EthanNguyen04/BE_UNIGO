@@ -225,7 +225,7 @@ exports.updatePaymentStatus = async (req, res) => {
         for (const order of orders) {
             if (order.payment_status === 'chua_thanh_toan') {
                 const hasDiscontinuedProduct = order.products.some(item => 
-                    item.product_id && item.product_id.status === 'ngung_ban'
+                    item.product_id && item.product_id.status === 'het_hang'
                 );
                 
                 if (hasDiscontinuedProduct) {

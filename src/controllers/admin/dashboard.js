@@ -2,7 +2,9 @@ const User = require('../../models/userModel');
 const Product = require('../../models/productModel');
 const Order = require('../../models/orderModel');
 const Category = require('../../models/categoryModel');
+const Evaluate = require('../../models/productEvaluateModel');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 
 
 // Controller chứa hàm lấy thống kê của admin
@@ -21,7 +23,6 @@ const adminStatisticsController = {
              */
             const sellingProducts = await Product.countDocuments({ status: 'dang_ban' });
             const outOfStockProducts = await Product.countDocuments({ status: 'het_hang' });
-            const stoppedProducts = await Product.countDocuments({ status: 'ngung_ban' });
 
             /*
              * Lấy tổng số lượng người dùng theo trạng thái tài khoản
@@ -46,8 +47,7 @@ const adminStatisticsController = {
                 // Số lượng sản phẩm đang được bày bán
                 sellingProducts,
                 // Số lượng sản phẩm đã hết hàng
-                outOfStockProducts,
-                // Số lượng sản phẩm đã ngừng bán
+                
                 stoppedProducts,
                 // Số lượng người dùng có trạng thái 'pending' (đang chờ xác minh)
                 pendingUsers,
@@ -85,13 +85,18 @@ const productController = {
             const products = await Product.find(filter).populate('category_id', 'name');
 
             // Xử lý và trả về danh sách sản phẩm
-            const result = products.map(product => {
+            const result = await Promise.all(products.map(async product => {
                 const prices = product.variants.map(variant => variant.price);
                 const minPrice = Math.min(...prices);
                 const maxPrice = Math.max(...prices);
                 const totalQuantity = product.variants.reduce((sum, variant) => sum + variant.quantity, 0);
                 const displayPrice = minPrice === maxPrice ? `${minPrice}` : `${minPrice} - ${maxPrice}`;
-                const productStatus = totalQuantity === 0 ? 'het_hang' : product.status;
+                
+                // Cập nhật status thành 'het_hang' nếu totalQuantity = 0
+                if (totalQuantity === 0 && product.status !== 'het_hang') {
+                    await Product.findByIdAndUpdate(product._id, { status: 'het_hang' });
+                    product.status = 'het_hang';
+                }
 
                 return {
                     id: product._id,
@@ -99,10 +104,10 @@ const productController = {
                     category: product.category_id?.name || 'Không xác định',
                     price: displayPrice,
                     totalQuantity,
-                    status: productStatus,
+                    status: product.status,
                     discount: product.discount
                 };
-            });
+            }));
 
             return res.status(200).json({ message: 'Danh sách sản phẩm', data: result });
         } catch (error) {
@@ -146,9 +151,16 @@ const getStats = {
 
             // Duyệt qua từng đơn hàng
             orders.forEach(order => {
+                if (!order.products || !Array.isArray(order.products)) return;
+
                 order.products.forEach(item => {
+                    // Kiểm tra nếu product_id tồn tại và hợp lệ
+                    if (!item.product_id || !item.product_id._id) {
+                        return; // Bỏ qua nếu không có product_id hoặc product_id._id
+                    }
+
                     const productId = item.product_id._id.toString();
-                    const productName = item.product_id.name;
+                    const productName = item.product_id.name || 'Sản phẩm không xác định';
 
                     // Nếu sản phẩm chưa có trong map, khởi tạo
                     if (!productStats.has(productId)) {
@@ -157,48 +169,56 @@ const getStats = {
                             productName,
                             totalQuantity: 0,
                             totalRevenue: 0,
-                            averageRating: 3 // Giá trị mặc định
+                            averageRating: 0,
+                            totalRatings: 0
                         });
                     }
 
                     const stats = productStats.get(productId);
 
-                    // Cộng dồn số lượng và doanh thu từ các variants
-                    item.variants.forEach(variant => {
-                        stats.totalQuantity += variant.attributes.quantity;
-                        stats.totalRevenue += variant.price * variant.attributes.quantity;
-                    });
+                    // Kiểm tra variants tồn tại trước khi tính toán
+                    if (item.variants && Array.isArray(item.variants)) {
+                        item.variants.forEach(variant => {
+                            if (variant && variant.attributes) {
+                                stats.totalQuantity += variant.attributes.quantity || 0;
+                                stats.totalRevenue += (variant.price || 0) * (variant.attributes.quantity || 0);
+                            }
+                        });
+                    }
                 });
+            });
+
+            // Tính toán đánh giá trung bình cho từng sản phẩm
+            const productIds = Array.from(productStats.keys());
+            const ratings = await Evaluate.aggregate([
+                {
+                    $match: {
+                        product_id: { $in: productIds.map(id => new mongoose.Types.ObjectId(id)) }
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$product_id",
+                        averageRating: { $avg: "$star" },
+                        totalRatings: { $sum: 1 }
+                    }
+                }
+            ]);
+
+            // Cập nhật thông tin đánh giá vào productStats
+            ratings.forEach(rating => {
+                const productId = rating._id.toString();
+                if (productStats.has(productId)) {
+                    const stats = productStats.get(productId);
+                    stats.averageRating = Number(rating.averageRating.toFixed(1));
+                    stats.totalRatings = rating.totalRatings;
+                }
             });
 
             // Chuyển map thành array và sắp xếp theo totalQuantity giảm dần
             const sortedStats = Array.from(productStats.values())
                 .sort((a, b) => b.totalQuantity - a.totalQuantity)
                 .slice(0, 10); // Lấy top 10
-
-            /*
-            * Ví dụ dữ liệu trả về:
-            * {
-            *   "success": true,
-            *   "data": [
-            *     {
-            *       "productId": "65f2e8b7c261e6001234abcd",
-            *       "productName": "Áo thun nam",
-            *       "totalQuantity": 150,
-            *       "totalRevenue": 4500000,
-            *       "averageRating": 3
-            *     },
-            *     {
-            *       "productId": "65f2e8b7c261e6001234abce",
-            *       "productName": "Quần jean nữ",
-            *       "totalQuantity": 120,
-            *       "totalRevenue": 3600000,
-            *       "averageRating": 3
-            *     },
-            *     // ... các sản phẩm khác
-            *   ]
-            * }
-            */
 
             return res.status(200).json({
                 success: true,

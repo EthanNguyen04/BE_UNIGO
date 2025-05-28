@@ -293,13 +293,13 @@ exports.getProduct = async (req, res) => {
     const totalReviews = starAggregation[0]?.totalReviews || 0;
 
     // 3. Tổng tồn kho tất cả variants
-    const totalQuantity = product.status === "ngung_ban" ? 0 : product.variants
+    const totalQuantity = product.status === "het_hang" ? 0 : product.variants
       .reduce((sum, v) => sum + v.quantity, 0);
 
     // 4. Xử lý variants kèm giá đã áp dụng discount
     const variants = product.variants.map(v => ({
       price:    Number((v.price * (1 - product.discount/100)).toFixed(2)),
-      quantity: product.status === "ngung_ban" ? 0 : v.quantity,
+      quantity: product.status === "het_hang" ? 0 : v.quantity,
       size:     v.size,
       color:    v.color
     }));
