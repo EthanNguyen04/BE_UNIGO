@@ -30,6 +30,7 @@ app.use("/api/order", require("./routes/oderRouters"));
 
 app.use("/api/discount", require("./routes/discountRouter"));
 
+app.use("/api/evaluate", require("./routes/evaluateRouter"));
 
 
 // Định tuyến ADMIN

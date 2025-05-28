@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const Product = require('../models/productModel');
 const Category = require('../models/categoryModel');
 const Order = require("../models/orderModel"); // Đường dẫn đến model Order
+const Evaluate = require('../models/productEvaluateModel'); // Sửa lại đường dẫn
 
 const mongoose = require("mongoose");
 
@@ -277,14 +278,28 @@ exports.getProduct = async (req, res) => {
     ]);
     const totalSold = orderAggregation[0]?.totalSold || 0;
 
+    // Tính số sao trung bình
+    const starAggregation = await Evaluate.aggregate([
+      { $match: { product_id: new mongoose.Types.ObjectId(productId) } },
+      { $group: {
+          _id: null,
+          averageStar: { $avg: "$star" },
+          totalReviews: { $sum: 1 }
+      }}
+    ]);
+    const averageStar = starAggregation[0]?.averageStar 
+      ? Number(starAggregation[0].averageStar.toFixed(1)) 
+      : 0;
+    const totalReviews = starAggregation[0]?.totalReviews || 0;
+
     // 3. Tổng tồn kho tất cả variants
-    const totalQuantity = product.variants
+    const totalQuantity = product.status === "ngung_ban" ? 0 : product.variants
       .reduce((sum, v) => sum + v.quantity, 0);
 
     // 4. Xử lý variants kèm giá đã áp dụng discount
     const variants = product.variants.map(v => ({
       price:    Number((v.price * (1 - product.discount/100)).toFixed(2)),
-      quantity: v.quantity,
+      quantity: product.status === "ngung_ban" ? 0 : v.quantity,
       size:     v.size,
       color:    v.color
     }));
@@ -298,7 +313,9 @@ exports.getProduct = async (req, res) => {
       stock:        totalQuantity,
       sold:         totalSold,
       description:  product.description,
-      variants
+      variants,
+      averageStar:  averageStar,
+      totalReviews: totalReviews
     });
   } catch (error) {
     console.error("Lỗi getProduct:", error);
