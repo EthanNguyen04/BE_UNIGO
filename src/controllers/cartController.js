@@ -119,36 +119,38 @@ exports.getUserCartProducts = async (req, res) => {
       }
       
       // Duyệt qua các mục trong cart để xây dựng dữ liệu trả về
-      const products = cart.products.map(item => {
-        // item.product_id đã được populate -> là document Product
-        const productDoc = item.product_id;
-      
-        // Tìm variant của sản phẩm tương ứng với color và size của mục trong cart
-        const matchedVariant = productDoc.variants.find(variant => {
-          return variant.color === item.color && variant.size === item.size;
+      const products = cart.products
+        .filter(item => item.product_id && item.product_id.status === 'dang_ban') // Chỉ lấy sản phẩm đang bán
+        .map(item => {
+          // item.product_id đã được populate -> là document Product
+          const productDoc = item.product_id;
+        
+          // Tìm variant của sản phẩm tương ứng với color và size của mục trong cart
+          const matchedVariant = productDoc.variants.find(variant => {
+            return variant.color === item.color && variant.size === item.size;
+          });
+          const originalPrice = matchedVariant ? matchedVariant.price : 0;
+          
+          // Tính effective price: áp dụng giảm giá (discount: phần trăm giảm giá)
+          const discountPercent = productDoc.discount || 0;
+          const effectivePrice = originalPrice * (1 - discountPercent / 100);
+          
+          return {
+            productId: productDoc._id,
+            name: productDoc.name,
+            firstImage: (productDoc.image_urls && productDoc.image_urls.length > 0)
+                          ? productDoc.image_urls[0]
+                          : null,
+            color: item.color,
+            size: item.size,
+            quantity: item.quantity,
+            price: effectivePrice
+          };
         });
-        const originalPrice = matchedVariant ? matchedVariant.price : 0;
-        
-        // Tính effective price: áp dụng giảm giá (discount: phần trăm giảm giá)
-        // Ví dụ: nếu discount là 20%, effectivePrice = variant.price * (1 - 20/100)
-        const discountPercent = productDoc.discount || 0;
-        const effectivePrice = originalPrice * (1 - discountPercent / 100);
-        
-        return {
-          productId: productDoc._id,
-          name: productDoc.name,
-          firstImage: (productDoc.image_urls && productDoc.image_urls.length > 0)
-                        ? productDoc.image_urls[0]
-                        : null,
-          color: item.color,
-          size: item.size,
-          quantity: item.quantity,
-          price: effectivePrice
-        };
-      });
-      console.log(products)
+
       return res.status(200).json({
-        products });
+        products
+      });
     } catch (error) {
       console.error('Lỗi khi lấy danh sách sản phẩm của user từ cart:', error);
       return res.status(500).json({ error: 'Lỗi server' });
