@@ -48,7 +48,7 @@ const adminStatisticsController = {
                 sellingProducts,
                 // Số lượng sản phẩm đã hết hàng
                 
-                stoppedProducts,
+                outOfStockProducts,
                 // Số lượng người dùng có trạng thái 'pending' (đang chờ xác minh)
                 pendingUsers,
                 // Số lượng người dùng có trạng thái 'active' (đã xác minh và hoạt động)
