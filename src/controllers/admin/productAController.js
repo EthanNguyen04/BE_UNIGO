@@ -361,7 +361,13 @@ exports.getProductAD = async (req, res) => {
     // 3. Tổng tồn kho
     const totalQuantity = product.variants.reduce((acc, v) => acc + v.quantity, 0);
 
-    // 4. Lấy thông tin variants từ DB
+    // 4. Cập nhật status nếu hết hàng
+    if (totalQuantity === 0 && product.status !== 'het_hang') {
+      product.status = 'het_hang';
+      await product.save();
+    }
+
+    // 5. Lấy thông tin variants từ DB
     const variants = product.variants.map(v => ({
       price: v.price,
       priceIn: v.priceIn,
@@ -370,7 +376,7 @@ exports.getProductAD = async (req, res) => {
       color: v.color
     }));
 
-    // 5. Response
+    // 6. Response
     return res.json({
       id: product._id,
       images: product.image_urls,
@@ -386,5 +392,134 @@ exports.getProductAD = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ message: error.message });
+  }
+};
+
+exports.updateProductDiscount = async (req, res) => {
+  try {
+    // 1. Xác thực token & quyền admin/staff
+    let token = req.headers.authorization;
+    if (!token || !token.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Vui lòng cung cấp token!' 
+      });
+    }
+    token = token.split(' ')[1];
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token không hợp lệ hoặc đã hết hạn' 
+      });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user || (user.role !== 'admin' && user.role !== 'staff')) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Chỉ admin và staff mới có quyền cập nhật giảm giá!' 
+      });
+    }
+
+    // 2. Lấy product ID và discount từ request
+    const { id } = req.params;
+    const { discount } = req.body;
+
+    // 3. Validate discount
+    if (discount === undefined || discount === null) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Vui lòng cung cấp giá trị giảm giá!' 
+      });
+    }
+
+    const discountValue = Number(discount);
+    if (isNaN(discountValue)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Giá trị giảm giá phải là số!' 
+      });
+    }
+
+    if (discountValue < 0 || discountValue > 100) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Giá trị giảm giá phải từ 0 đến 100!' 
+      });
+    }
+
+    // 4. Validate product ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ID sản phẩm không hợp lệ!' 
+      });
+    }
+
+    // 5. Cập nhật discount trực tiếp bằng findOneAndUpdate
+    const updatedProduct = await Product.findOneAndUpdate(
+      { _id: id },
+      { $set: { discount: discountValue } },
+      { 
+        new: true,
+        runValidators: true
+      }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Không tìm thấy sản phẩm!' 
+      });
+    }
+
+    // 6. Trả về kết quả
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật giảm giá thành công!',
+      data: {
+        id: updatedProduct._id,
+        name: updatedProduct.name,
+        discount: updatedProduct.discount,
+        isOnSale: updatedProduct.discount > 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in updateProductDiscount:', error);
+    
+    // Xử lý các loại lỗi cụ thể
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Dữ liệu không hợp lệ', 
+        error: error.message 
+      });
+    }
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token không hợp lệ' 
+      });
+    }
+    
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Token đã hết hạn' 
+      });
+    }
+
+    // Lỗi không xác định
+    return res.status(500).json({ 
+      success: false,
+      message: 'Lỗi máy chủ', 
+      error: error.message 
+    });
   }
 };

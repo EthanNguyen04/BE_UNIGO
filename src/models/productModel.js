@@ -21,7 +21,7 @@ const productSchema = new mongoose.Schema({
     }, // Mô tả chi tiết sản phẩm
     status: {
         type: String,
-        enum: ['dang_ban', 'het_hang', 'ngung_ban'],
+        enum: ['dang_ban', 'het_hang'],
         default: 'dang_ban'
     }, // Trạng thái: đang bán, hết hàng, ngừng bán
     discount: { 
@@ -57,5 +57,5 @@ const productSchema = new mongoose.Schema({
 });
 
 
-const Product = mongoose.model('Prosucttest', productSchema);
+const Product = mongoose.model('product', productSchema);
 module.exports = Product;

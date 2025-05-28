@@ -13,7 +13,7 @@ const orderSchema = new mongoose.Schema({
             // ID sản phẩm
             product_id: { 
                 type: mongoose.Schema.Types.ObjectId, 
-                ref: 'Prosucttest', 
+                ref: 'product', 
                 required: true 
             },
             // Các phiên bản (variant) của sản phẩm
