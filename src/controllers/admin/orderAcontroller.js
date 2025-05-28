@@ -87,9 +87,11 @@ exports.getAllOrders = async (req, res) => {
         },
         order_status:   order.order_status,
         payment_status: order.payment_status,
+        ...(order.order_status === 'huy' && { cancellation_reason: order.cancellation_reason }),
         products,
         rawTotal,       // tổng giá trước giảm
-        purchaseTotal   // tổng giá sau giảm
+        purchaseTotal,  // tổng giá sau giảm
+        createdAt:      order.createdAt
       };
     }));
 
@@ -119,13 +121,18 @@ exports.batchUpdateOrderStatus = async (req, res) => {
       }
   
       // 2. Nhận order_ids và order_status từ body
-      const { order_ids, order_status } = req.body;
+      const { order_ids, order_status, cancellation_reason } = req.body;
       if (!Array.isArray(order_ids) || order_ids.length === 0) {
         return res.status(400).json({ error: "Vui lòng gửi mảng order_ids." });
       }
       const validStatuses = ['cho_xac_nhan','cho_lay_hang','dang_giao','da_giao','hoan_thanh','huy'];
       if (!order_status || !validStatuses.includes(order_status)) {
         return res.status(400).json({ error: "order_status không hợp lệ." });
+      }
+  
+      // Kiểm tra cancellation_reason khi order_status là 'huy'
+      if (order_status === 'huy' && !cancellation_reason) {
+        return res.status(400).json({ error: "Vui lòng cung cấp lý do hủy đơn hàng." });
       }
   
       // 3. Chuyển order_ids thành ObjectId hợp lệ
@@ -138,9 +145,13 @@ exports.batchUpdateOrderStatus = async (req, res) => {
       }
   
       // 4. Cập nhật nhiều đơn
+      const updateData = order_status === 'huy' 
+        ? { order_status, cancellation_reason }
+        : { order_status };
+        
       const result = await Order.updateMany(
         { _id: { $in: objectIds } },
-        { order_status },
+        updateData
       );
   
       return res.status(200).json({
